@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="styles.css?v=20261102-5" />
+    <link rel="stylesheet" href="styles.css?v=20261102-6" />
   </head>
   <body>
     <!-- Accesso -->
@@ -102,6 +102,7 @@
             </header>
             <p class="foot muted" id="fox-stato">I dati si aggiornano da Fox ESS in automatico quando apri l’app.</p>
             <div class="kpis kpis-fv" id="fv-kpis"></div>
+            <p class="foot nota-ast" id="fv-nota" hidden></p>
             <div class="legend" id="legend-fv"></div>
             <div class="chart-box tall"><canvas id="chart-fv" aria-label="Consumo totale e produzione per bimestre"></canvas></div>
             <p class="foot muted">Lordo = prodotto dai pannelli (come l’app Fox ESS); netti = uscita dell’inverter, dopo le perdite di conversione e batteria. Autoconsumo = netti − venduti. Consumo totale = prelevato dalla rete (bolletta) + autoconsumo. Prima di marzo 2024 il dato dei pannelli non c’è: lordo = netti.</p>
@@ -289,6 +290,6 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script src="supabase-config.js"></script>
-    <script src="app.js?v=20261102-6"></script>
+    <script src="app.js?v=20261102-7"></script>
   </body>
 </html>

@@ -105,6 +105,9 @@ function fvBimestri() {
     return { ...r, netti, perdite, prelievo, autoconsumo, venduti, consumoTotale: (prelievo ?? 0) + autoconsumo };
   });
 }
+// es. 202610 → "settembre-ottobre 2026"
+const nomeBimestre = codice => { const m = Number(codice.slice(4, 6)); return `${MESI_LUNGHI[m - 2] ?? ''}-${MESI_LUNGHI[m - 1] ?? ''} ${codice.slice(0, 4)}`; };
+const elenco = l => l.length < 2 ? l.join('') : `${l.slice(0, -1).join(', ')} e ${l.at(-1)}`;
 const NOMI_BIM = ['Gen-Feb', 'Mar-Apr', 'Mag-Giu', 'Lug-Ago', 'Set-Ott', 'Nov-Dic'];
 const etichettaBimestre = codice => { const m = Number(codice.slice(4, 6)); return `${NOMI_BIM[Math.ceil(m / 2) - 1] || codice.slice(4)} ${codice.slice(2, 4)}`; };
 
@@ -343,12 +346,14 @@ function renderFotovoltaico() {
   const primo = bim[0]?.periodo_dal;
   const speseLuce = bollette.filter(b => b.tipo === 'luce' && primo && b.periodo_al >= primo).reduce((s, b) => s + b.importo, 0);
   const kwh = v => `${num0.format(v)} kWh`;
+  // Bimestri senza bolletta luce registrata: manca il prelievo dalla rete, la copertura risulta per eccesso
+  const senzaBolletta = bim.filter(r => r.prelievo == null);
   $('#fv-kpis').innerHTML = bim.length ? `
     <div class="kpi"><div class="label">Prodotti (lordo)</div><div class="value">${kwh(prod)}</div><div class="sub">netti ${kwh(netti)} · dal ${primo ? meseAnno(primo) : ''}</div></div>
     <div class="kpi"><div class="label">Perdite inverter e batteria</div><div class="value">${lordoP ? num1.format(perdP / lordoP * 100) + '%' : '–'}</div><div class="sub">${lordoP ? `${kwh(perdP)} da ${meseAnno(conPerdite[0].periodo_dal)}` : 'dato dei pannelli non disponibile'}</div></div>
     <div class="kpi"><div class="label">Autoconsumati</div><div class="value">${kwh(auto)}</div><div class="sub">${num0.format(auto / netti * 100)}% dei netti</div></div>
     <div class="kpi"><div class="label">Venduti alla rete</div><div class="value">${kwh(vend)}</div><div class="sub">${num0.format(vend / netti * 100)}% dei netti</div></div>
-    <div class="kpi"><div class="label">Coperto dal fotovoltaico</div><div class="value">${num0.format(auto / tot * 100)}%</div><div class="sub">del consumo totale (${kwh(tot)})</div></div>
+    <div class="kpi"><div class="label">Coperto dal fotovoltaico</div><div class="value">${num0.format(auto / tot * 100)}%${senzaBolletta.length ? '<span class="ast">*</span>' : ''}</div><div class="sub">del consumo totale (${kwh(tot)})</div></div>
     <div class="kpi"><div class="label">Bonifici GSE</div><div class="value">${eur0.format(bonifici)}</div><div class="sub">${gse.length} accrediti</div></div>
     <div class="kpi"><div class="label">Spesa luce netta</div><div class="value">${eur0.format(speseLuce - bonifici)}</div><div class="sub">bollette ${eur0.format(speseLuce)} − GSE</div></div>`
     : '<p class="muted">Nessun dato del fotovoltaico. Aggiungi un bimestre.</p>';
@@ -377,6 +382,10 @@ function renderFotovoltaico() {
     },
     options: opts,
   });
+  $('#fv-nota').hidden = !senzaBolletta.length;
+  $('#fv-nota').textContent = senzaBolletta.length
+    ? `* Dato per eccesso, in attesa della registrazione ${senzaBolletta.length === 1 ? 'della bolletta luce' : 'delle bollette luce'} di ${elenco(senzaBolletta.map(r => nomeBimestre(r.codice)))}.`
+    : '';
   $('#legend-fv').innerHTML = `<span><i style="background:var(--rete)"></i>Dalla rete</span><span><i style="background:var(--fv)"></i>Dal fotovoltaico</span><span><i class="line" style="background:var(--text-2)"></i>Prodotti (lordo)</span>`;
 
   // Riepilogo per anno (anno del bimestre)
@@ -387,7 +396,7 @@ function renderFotovoltaico() {
   }
   for (const g of gse) { const y = g.data_accredito.slice(0, 4); (perY[y] ??= { prod: 0, netti: 0, auto: 0, vend: 0, tot: 0, gse: 0 }).gse += g.importo; }
   $('#fv-anni').innerHTML = `<thead><tr><th>Anno</th><th>Lordo</th><th>Netti</th><th>Autocons.</th><th>Venduti</th><th>Coperto</th><th>GSE</th></tr></thead><tbody>` +
-    Object.keys(perY).sort().map(y => { const a = perY[y]; return `<tr><td>${y}</td><td>${num0.format(a.prod)}</td><td>${num0.format(a.netti)}</td><td>${num0.format(a.auto)}</td><td>${num0.format(a.vend)}</td><td>${a.tot ? num0.format(a.auto / a.tot * 100) + '%' : '–'}</td><td>${a.gse ? eur.format(a.gse) : '–'}</td></tr>`; }).join('') + '</tbody>';
+    Object.keys(perY).sort().map(y => { const a = perY[y]; return `<tr><td>${y}</td><td>${num0.format(a.prod)}</td><td>${num0.format(a.netti)}</td><td>${num0.format(a.auto)}</td><td>${num0.format(a.vend)}</td><td>${a.tot ? num0.format(a.auto / a.tot * 100) + '%' + (senzaBolletta.some(r => r.codice.startsWith(y)) ? '*' : '') : '–'}</td><td>${a.gse ? eur.format(a.gse) : '–'}</td></tr>`; }).join('') + '</tbody>';
 
   $('#fv-lista').innerHTML = (bim.length ? '<div class="mini-riga mini-head"><span>Bimestre</span><span>kWh lordo / netti / venduti</span><span></span></div>' : '') + [...bim].reverse().map(r => `<div class="mini-riga"><div><span class="codice">${esc(r.codice)}</span> <small>${etichettaBimestre(r.codice)}${r.note ? ' · ' + esc(r.note) : ''}</small></div><div>${num0.format(r.kwh_prodotti)} / ${num0.format(r.netti)} / ${r.kwh_immessi == null ? '–' : num0.format(r.kwh_immessi)}</div><button class="icon-btn" data-fv="${r.id}">Modifica</button></div>`).join('') || '<p class="muted">Nessun bimestre.</p>';
   $('#gse-lista').innerHTML = (gse.length ? '<div class="mini-riga mini-head"><span>Data</span><span>Importo</span><span></span></div>' : '') + [...gse].reverse().map(g => `<div class="mini-riga"><div>${fmtData(g.data_accredito)}${g.note ? `<small>${esc(g.note)}</small>` : ''}</div><div>${eur.format(g.importo)}</div><button class="icon-btn" data-gse="${g.id}">Modifica</button></div>`).join('') || '<p class="muted">Nessun bonifico.</p>';

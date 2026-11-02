@@ -20,6 +20,9 @@ const fmtConsumo = (v, tipo) => `${(tipo === 'luce' ? num0 : num1).format(v)} ${
 
 let sb = null;
 let bollette = [];
+let fv = [];      // casa_fotovoltaico
+let gse = [];     // casa_gse_bonifici
+let fvDisponibile = false; // false finché le tabelle del fotovoltaico non esistono
 let state = { tipo: 'tutte', confrontoTipo: 'luce', misura: 'spesa', anno: null }; // anno null = ultimo anno disponibile
 const charts = {};
 
@@ -68,15 +71,35 @@ $('#logout-btn').addEventListener('click', async () => { await sb.auth.signOut()
 /* ---------- Dati ---------- */
 
 async function caricaDati() {
-  const { data, error } = await sb.from('casa_bollette').select('*').order('periodo_al', { ascending: true });
-  if (error) { alert('Non riesco a leggere le bollette: ' + error.message); return; }
-  bollette = data.map(r => ({
+  const [b, f, g] = await Promise.all([
+    sb.from('casa_bollette').select('*').order('periodo_al', { ascending: true }),
+    sb.from('casa_fotovoltaico').select('*').order('periodo_al', { ascending: true }),
+    sb.from('casa_gse_bonifici').select('*').order('data_accredito', { ascending: true }),
+  ]);
+  if (b.error) { alert('Non riesco a leggere le bollette: ' + b.error.message); return; }
+  bollette = b.data.map(r => ({
     ...r,
     importo: Number(r.importo), consumo: Number(r.consumo),
     oneri_extra: Number(r.oneri_extra), bonus: Number(r.bonus),
   }));
+  fvDisponibile = !f.error && !g.error;
+  fv = (f.data || []).map(r => ({ ...r, kwh_prodotti: Number(r.kwh_prodotti), kwh_immessi: r.kwh_immessi == null ? null : Number(r.kwh_immessi) }));
+  gse = (g.data || []).map(r => ({ ...r, importo: Number(r.importo) }));
   render();
 }
+
+// Bimestri del fotovoltaico arricchiti con il prelievo dalla bolletta luce dello stesso nome
+function fvBimestri() {
+  return fv.map(r => {
+    const bol = bollette.find(b => b.tipo === 'luce' && b.categoria === 'bolletta' && b.codice === r.codice);
+    const prelievo = bol ? bol.consumo : null;
+    const venduti = r.kwh_immessi ?? 0;
+    const autoconsumo = Math.max(0, r.kwh_prodotti - venduti);
+    return { ...r, prelievo, autoconsumo, venduti, consumoTotale: (prelievo ?? 0) + autoconsumo };
+  });
+}
+const NOMI_BIM = ['Gen-Feb', 'Mar-Apr', 'Mag-Giu', 'Lug-Ago', 'Set-Ott', 'Nov-Dic'];
+const etichettaBimestre = codice => { const m = Number(codice.slice(4, 6)); return `${NOMI_BIM[Math.ceil(m / 2) - 1] || codice.slice(4)} ${codice.slice(2, 4)}`; };
 
 // Ricarica quando si torna sull'app (es. dopo aver aggiunto una bolletta da un altro dispositivo)
 document.addEventListener('visibilitychange', () => { if (!document.hidden && currentUser) caricaDati(); });
@@ -141,6 +164,7 @@ function render() {
   renderAnni(anni);
   renderConfronto(mesi);
   renderTipi(anni);
+  renderFotovoltaico();
   renderLista();
 }
 
@@ -295,6 +319,68 @@ function renderTipi(anni) {
   }
 }
 
+function renderFotovoltaico() {
+  const card = $('#fv-card');
+  card.hidden = !fvDisponibile || !(state.tipo === 'tutte' || state.tipo === 'luce');
+  if (card.hidden) return;
+  const bim = fvBimestri();
+  const prod = bim.reduce((s, r) => s + r.kwh_prodotti, 0);
+  const auto = bim.reduce((s, r) => s + r.autoconsumo, 0);
+  const vend = bim.reduce((s, r) => s + r.venduti, 0);
+  const tot = bim.reduce((s, r) => s + r.consumoTotale, 0);
+  const bonifici = gse.reduce((s, r) => s + r.importo, 0);
+  const primo = bim[0]?.periodo_dal;
+  const speseLuce = bollette.filter(b => b.tipo === 'luce' && primo && b.periodo_al >= primo).reduce((s, b) => s + b.importo, 0);
+  const kwh = v => `${num0.format(v)} kWh`;
+  $('#fv-kpis').innerHTML = bim.length ? `
+    <div class="kpi"><div class="label">Prodotti</div><div class="value">${kwh(prod)}</div><div class="sub">dal ${primo ? meseAnno(primo) : ''}</div></div>
+    <div class="kpi"><div class="label">Autoconsumati</div><div class="value">${kwh(auto)}</div><div class="sub">${num0.format(auto / prod * 100)}% della produzione</div></div>
+    <div class="kpi"><div class="label">Venduti alla rete</div><div class="value">${kwh(vend)}</div><div class="sub">${num0.format(vend / prod * 100)}% della produzione</div></div>
+    <div class="kpi"><div class="label">Coperto dal fotovoltaico</div><div class="value">${num0.format(auto / tot * 100)}%</div><div class="sub">del consumo totale (${kwh(tot)})</div></div>
+    <div class="kpi"><div class="label">Bonifici GSE</div><div class="value">${eur0.format(bonifici)}</div><div class="sub">${gse.length} accrediti</div></div>
+    <div class="kpi"><div class="label">Spesa luce netta</div><div class="value">${eur0.format(speseLuce - bonifici)}</div><div class="sub">bollette ${eur0.format(speseLuce)} − GSE</div></div>`
+    : '<p class="muted">Nessun dato del fotovoltaico. Aggiungi un bimestre.</p>';
+
+  const labels = bim.map(r => etichettaBimestre(r.codice));
+  const opts = baseOptions();
+  opts.scales.x.stacked = true; opts.scales.y.stacked = true;
+  opts.scales.x.ticks.maxRotation = 0; opts.scales.x.ticks.autoSkip = true; opts.scales.x.ticks.maxTicksLimit = 12;
+  opts.scales.y.ticks.callback = v => num0.format(v);
+  opts.plugins.tooltip.callbacks = {
+    label: c => ` ${c.dataset.label}: ${kwh(c.parsed.y)}`,
+    footer: items => {
+      const r = bim[items[0].dataIndex];
+      return [`Consumo totale: ${kwh(r.consumoTotale)}`, r.kwh_immessi == null ? 'Venduti non disponibili' : `Venduti: ${kwh(r.venduti)}`, r.prelievo == null ? 'Bolletta luce non ancora inserita' : ''].filter(Boolean);
+    },
+  };
+  disegna('chart-fv', {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        { type: 'line', label: 'Prodotti', data: bim.map(r => r.kwh_prodotti), borderColor: css('--text-2'), backgroundColor: css('--text-2'), borderDash: [5, 4], borderWidth: 2, pointRadius: 0, pointHoverRadius: 4, tension: 0.3, stack: 'prod', order: 0 },
+        { label: 'Dal fotovoltaico', data: bim.map(r => +r.autoconsumo.toFixed(1)), backgroundColor: css('--fv'), borderColor: css('--surface'), borderWidth: { top: 2 }, borderRadius: 4, borderSkipped: 'bottom', stack: 'cons', order: 2 },
+        { label: 'Dalla rete', data: bim.map(r => r.prelievo ?? 0), backgroundColor: css('--rete'), borderRadius: 4, borderSkipped: 'bottom', stack: 'cons', order: 1 },
+      ],
+    },
+    options: opts,
+  });
+  $('#legend-fv').innerHTML = `<span><i style="background:var(--rete)"></i>Dalla rete</span><span><i style="background:var(--fv)"></i>Dal fotovoltaico</span><span><i class="line" style="background:var(--text-2)"></i>Prodotti</span>`;
+
+  // Riepilogo per anno (anno del bimestre)
+  const perY = {};
+  for (const r of bim) {
+    const y = r.codice.slice(0, 4); const a = perY[y] ??= { prod: 0, auto: 0, vend: 0, tot: 0, gse: 0 };
+    a.prod += r.kwh_prodotti; a.auto += r.autoconsumo; a.vend += r.venduti; a.tot += r.consumoTotale;
+  }
+  for (const g of gse) { const y = g.data_accredito.slice(0, 4); (perY[y] ??= { prod: 0, auto: 0, vend: 0, tot: 0, gse: 0 }).gse += g.importo; }
+  $('#fv-anni').innerHTML = `<thead><tr><th>Anno</th><th>Prodotti</th><th>Autocons.</th><th>Venduti</th><th>Coperto</th><th>GSE</th></tr></thead><tbody>` +
+    Object.keys(perY).sort().map(y => { const a = perY[y]; return `<tr><td>${y}</td><td>${num0.format(a.prod)}</td><td>${num0.format(a.auto)}</td><td>${num0.format(a.vend)}</td><td>${a.tot ? num0.format(a.auto / a.tot * 100) + '%' : '–'}</td><td>${a.gse ? eur.format(a.gse) : '–'}</td></tr>`; }).join('') + '</tbody>';
+
+  $('#fv-lista').innerHTML = (bim.length ? '<div class="mini-riga mini-head"><span>Bimestre</span><span>kWh prodotti / venduti</span><span></span></div>' : '') + [...bim].reverse().map(r => `<div class="mini-riga"><div><span class="codice">${esc(r.codice)}</span> <small>${etichettaBimestre(r.codice)}${r.note ? ' · ' + esc(r.note) : ''}</small></div><div>${num0.format(r.kwh_prodotti)} / ${r.kwh_immessi == null ? '–' : num0.format(r.kwh_immessi)}</div><button class="icon-btn" data-fv="${r.id}">Modifica</button></div>`).join('') || '<p class="muted">Nessun bimestre.</p>';
+  $('#gse-lista').innerHTML = (gse.length ? '<div class="mini-riga mini-head"><span>Data</span><span>Importo</span><span></span></div>' : '') + [...gse].reverse().map(g => `<div class="mini-riga"><div>${fmtData(g.data_accredito)}${g.note ? `<small>${esc(g.note)}</small>` : ''}</div><div>${eur.format(g.importo)}</div><button class="icon-btn" data-gse="${g.id}">Modifica</button></div>`).join('') || '<p class="muted">Nessun bonifico.</p>';
+}
+
 function renderLista() {
   const tipi = tipiAttivi();
   const lista = bollette.filter(b => tipi.includes(b.tipo));
@@ -314,7 +400,15 @@ function renderLista() {
       <div class="num importo ${b.importo < 0 ? 'neg' : ''}">${eur.format(b.importo)}</div>
       <div class="azioni">${b.file_url ? `<a class="link" href="${esc(b.file_url)}" target="_blank" rel="noopener">PDF</a>` : ''}<button class="icon-btn" data-edit="${b.id}" aria-label="Modifica ${esc(b.codice)}">Modifica</button></div>
       ${b.note ? `<div class="nota">${esc(b.note)}</div>` : ''}
+      ${fvRiga(b)}
     </div>`).join('');
+}
+
+function fvRiga(b) {
+  if (b.tipo !== 'luce' || b.categoria !== 'bolletta') return '';
+  const r = fv.find(x => x.codice === b.codice);
+  if (!r) return '';
+  return `<div class="fv-riga"><i class="dot fv"></i>FV: prodotti ${num0.format(r.kwh_prodotti)} kWh · venduti ${r.kwh_immessi == null ? 'n.d.' : num0.format(r.kwh_immessi) + ' kWh'}</div>`;
 }
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -394,6 +488,71 @@ $('#delete-btn').addEventListener('click', async () => {
   const { error } = await sb.from('casa_bollette').delete().eq('id', editId);
   if (error) { $('#dialog-message').textContent = 'Errore: ' + error.message; return; }
   dlg.close(); await caricaDati();
+});
+
+/* ---------- Finestre fotovoltaico e GSE ---------- */
+
+function setupDialog({ dlgSel, formSel, table, campi, numerici, titolo, getRow, defaults, delSel, msgSel, descr }) {
+  const d = $(dlgSel), f = $(formSel);
+  let id = null;
+  const apri = row => {
+    id = row?.id || null; f.reset();
+    $(msgSel).textContent = '';
+    $(delSel).hidden = !row;
+    d.querySelector('h2').textContent = row ? `Modifica ${titolo}` : `Nuovo ${titolo}`;
+    const v = row || defaults();
+    for (const c of campi) if (v[c] != null) f.elements[c].value = v[c];
+    d.showModal();
+  };
+  d.querySelector('[data-close]').addEventListener('click', () => d.close());
+  f.addEventListener('submit', async e => {
+    e.preventDefault();
+    const r = {};
+    for (const c of campi) { const v = f.elements[c].value.trim(); r[c] = v === '' ? null : (numerici.includes(c) ? Number(v) : v); }
+    if (r.periodo_dal && r.periodo_al && r.periodo_al < r.periodo_dal) { $(msgSel).textContent = 'La fine del periodo è prima dell’inizio.'; return; }
+    $(msgSel).textContent = 'Salvataggio…';
+    const { error } = id ? await sb.from(table).update(r).eq('id', id) : await sb.from(table).insert(r);
+    if (error) { $(msgSel).textContent = error.code === '23505' ? 'Esiste già un dato per questo bimestre.' : 'Errore: ' + error.message; return; }
+    d.close(); await caricaDati();
+  });
+  $(delSel).addEventListener('click', async () => {
+    const row = getRow(id);
+    if (!row || !confirm(`Eliminare ${descr(row)}?`)) return;
+    const { error } = await sb.from(table).delete().eq('id', id);
+    if (error) { $(msgSel).textContent = 'Errore: ' + error.message; return; }
+    d.close(); await caricaDati();
+  });
+  return apri;
+}
+
+const apriFv = setupDialog({
+  dlgSel: '#fv-dialog', formSel: '#fv-form', table: 'casa_fotovoltaico', titolo: 'bimestre fotovoltaico',
+  campi: ['codice', 'periodo_dal', 'periodo_al', 'kwh_prodotti', 'kwh_immessi', 'note'], numerici: ['kwh_prodotti', 'kwh_immessi'],
+  getRow: id => fv.find(r => r.id === id), msgSel: '#fv-message', delSel: '#fv-delete-btn',
+  descr: r => `i dati del fotovoltaico ${r.codice}`,
+  defaults: () => {
+    // propone la prima bolletta luce senza dati del fotovoltaico
+    const b = [...bollette].reverse().find(x => x.tipo === 'luce' && x.categoria === 'bolletta' && !fv.some(r => r.codice === x.codice));
+    return b ? { codice: b.codice, periodo_dal: b.periodo_dal, periodo_al: b.periodo_al } : {};
+  },
+});
+const apriGse = setupDialog({
+  dlgSel: '#gse-dialog', formSel: '#gse-form', table: 'casa_gse_bonifici', titolo: 'bonifico GSE',
+  campi: ['data_accredito', 'importo', 'note'], numerici: ['importo'],
+  getRow: id => gse.find(r => r.id === id), msgSel: '#gse-message', delSel: '#gse-delete-btn',
+  descr: r => `il bonifico GSE del ${fmtData(r.data_accredito)}`,
+  defaults: () => ({ data_accredito: new Date().toISOString().slice(0, 10) }),
+});
+// Il codice del bimestre compila da solo le date, se c'è la bolletta luce corrispondente
+$('#fv-form').elements.codice.addEventListener('change', e => {
+  const b = bollette.find(x => x.tipo === 'luce' && x.categoria === 'bolletta' && x.codice === e.target.value.trim());
+  if (b) { e.target.form.elements.periodo_dal.value = b.periodo_dal; e.target.form.elements.periodo_al.value = b.periodo_al; }
+});
+$('#fv-add-btn').addEventListener('click', () => apriFv());
+$('#gse-add-btn').addEventListener('click', () => apriGse());
+$('#fv-card').addEventListener('click', e => {
+  const f = e.target.closest('[data-fv]')?.dataset.fv; if (f) apriFv(fv.find(r => r.id === f));
+  const g = e.target.closest('[data-gse]')?.dataset.gse; if (g) apriGse(gse.find(r => r.id === g));
 });
 
 init();

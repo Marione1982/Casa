@@ -573,12 +573,14 @@ $('#fv-card').addEventListener('click', e => {
 // Chiede alla funzione Supabase i dati Fox ESS dell'anno e aggiorna i bimestri.
 // In automatico al massimo ogni 6 ore per dispositivo; il pulsante forza l'aggiornamento.
 const FOX_OGNI = 6 * 3600 * 1000;
+let foxInCorso = false;
 async function aggiornaFox(manuale = false) {
-  if (!fvDisponibile || !currentUser) return;
+  if (!fvDisponibile || !currentUser || foxInCorso) return; // una richiesta alla volta (Fox ESS ne accetta una al secondo)
   let ultimo = 0;
   try { ultimo = Number(localStorage.getItem('casa-fox-ultimo')) || 0; } catch {}
   if (!manuale && Date.now() - ultimo < FOX_OGNI) return;
   const btn = $('#fox-btn');
+  foxInCorso = true;
   if (manuale) { btn.disabled = true; btn.textContent = 'Aggiorno…'; }
   try {
     const { data, error } = await sb.functions.invoke('casa-foxess-sync', { method: 'POST' });
@@ -589,6 +591,7 @@ async function aggiornaFox(manuale = false) {
   } catch (e) {
     $('#fox-stato').textContent = 'Aggiornamento da Fox ESS non riuscito' + (manuale ? `: ${e.message}` : '');
   } finally {
+    foxInCorso = false;
     btn.disabled = false; btn.textContent = 'Aggiorna da Fox ESS';
   }
 }

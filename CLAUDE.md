@@ -6,7 +6,7 @@ Webapp in italiano per i conti di casa e famiglia, a sezioni. Sezione attiva: **
 ## Stack
 - HTML, CSS e JavaScript puro. Nessun build, nessun package manager.
 - `@supabase/supabase-js` 2.118.0 e `chart.js` 4.4.1 da CDN (jsdelivr) in `index.html`.
-- Hosting: GitHub Pages, <https://marione1982.github.io/casa/> (pubblicato da `.github/workflows/deploy.yml` a ogni push su `main`).
+- Hosting: GitHub Pages, <https://marione1982.github.io/Casa/> (pubblicato da `.github/workflows/deploy.yml` a ogni push su `main`).
 
 ## File
 - `index.html`: struttura, accesso, sezioni, finestra bolletta.

@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="it">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#f6f5f1" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#161615" media="(prefers-color-scheme: dark)" />
+    <title>Casa</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%231f5c4a'/%3E%3Cpath d='M8 16 16 9l8 7v8h-5v-5h-6v5H8z' fill='%23fff'/%3E%3C/svg%3E" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css?v=20261102-1" />
+  </head>
+  <body>
+    <!-- Accesso -->
+    <section id="auth-view" class="auth" hidden>
+      <div class="auth-card">
+        <div class="brand brand-lg"><span class="brand-mark" aria-hidden="true"></span><span>Casa</span></div>
+        <p class="muted">Conti di casa e famiglia. Accedi con lo stesso account di Pizzeria.</p>
+        <form id="login-form" class="stack">
+          <label>Email<input type="email" id="login-email" autocomplete="username" required /></label>
+          <label>Password<input type="password" id="login-password" autocomplete="current-password" required /></label>
+          <button class="btn primary" type="submit">Accedi</button>
+          <p id="auth-message" class="form-message" role="status"></p>
+        </form>
+      </div>
+    </section>
+
+    <!-- App -->
+    <div id="app-view" class="app" hidden>
+      <header class="topbar">
+        <div class="brand"><span class="brand-mark" aria-hidden="true"></span><span>Casa</span></div>
+        <nav class="sections" aria-label="Sezioni">
+          <button class="section-tab active" data-section="forniture">Forniture</button>
+          <button class="section-tab" data-section="spese">Spese fisse</button>
+          <button class="section-tab" data-section="budget">Budget</button>
+        </nav>
+        <button id="logout-btn" class="btn ghost small" type="button">Esci</button>
+      </header>
+
+      <main>
+        <!-- Sezione Forniture -->
+        <section id="section-forniture" class="section">
+          <div class="section-head">
+            <div>
+              <h1>Forniture</h1>
+              <p class="muted" id="period-label">Luce, gas e acqua</p>
+            </div>
+            <button id="add-btn" class="btn primary" type="button">+ Bolletta</button>
+          </div>
+
+          <div class="filters" role="group" aria-label="Filtri">
+            <div class="segmented" id="tipo-filter">
+              <button data-tipo="tutte" class="on">Tutte</button>
+              <button data-tipo="luce"><i class="dot luce"></i>Luce</button>
+              <button data-tipo="gas"><i class="dot gas"></i>Gas</button>
+              <button data-tipo="acqua"><i class="dot acqua"></i>Acqua</button>
+            </div>
+          </div>
+
+          <div class="kpis" id="kpis"></div>
+
+          <article class="card">
+            <header class="card-head">
+              <h2>Spesa per anno</h2>
+              <div class="legend" id="legend-anni"></div>
+            </header>
+            <div class="chart-box"><canvas id="chart-anni" aria-label="Spesa per anno"></canvas></div>
+            <p class="foot muted" id="anni-foot"></p>
+          </article>
+
+          <article class="card">
+            <header class="card-head">
+              <h2>Stesso mese, anni diversi</h2>
+              <div class="segmented small" id="confronto-tipo">
+                <button data-tipo="luce" class="on">Luce</button>
+                <button data-tipo="gas">Gas</button>
+                <button data-tipo="acqua">Acqua</button>
+              </div>
+            </header>
+            <div class="segmented small" id="confronto-misura">
+              <button data-misura="spesa" class="on">Spesa €</button>
+              <button data-misura="consumo">Consumo</button>
+            </div>
+            <div class="legend" id="legend-confronto"></div>
+            <div class="chart-box tall"><canvas id="chart-confronto" aria-label="Confronto mensile tra anni"></canvas></div>
+            <p class="foot muted">Ogni bolletta è ripartita sui giorni del suo periodo, così bimestri e trimestri diventano mesi confrontabili.</p>
+          </article>
+
+          <div class="tipi" id="tipi"></div>
+
+          <article class="card">
+            <header class="card-head">
+              <h2>Bollette</h2>
+              <select id="anno-filter" aria-label="Anno"></select>
+            </header>
+            <div id="lista" class="lista"></div>
+          </article>
+        </section>
+
+        <section id="section-spese" class="section" hidden>
+          <div class="empty-state"><h1>Spese fisse</h1><p class="muted">In arrivo: rate, finanziamenti e abbonamenti dal tuo foglio Excel, con la proiezione dei mesi futuri.</p></div>
+        </section>
+        <section id="section-budget" class="section" hidden>
+          <div class="empty-state"><h1>Budget</h1><p class="muted">In arrivo: entrate, uscite e disponibilità del mese.</p></div>
+        </section>
+      </main>
+    </div>
+
+    <div id="loading" class="loading">Caricamento…</div>
+
+    <!-- Finestra bolletta -->
+    <dialog id="bolletta-dialog">
+      <form id="bolletta-form" method="dialog" class="stack">
+        <h2 id="dialog-title">Bolletta</h2>
+        <div class="grid2">
+          <label>Tipo
+            <select name="tipo" required>
+              <option value="luce">Luce</option><option value="gas">Gas</option><option value="acqua">Acqua</option>
+            </select>
+          </label>
+          <label>Nome file (codice)<input name="codice" required placeholder="es. 202610" /></label>
+          <label>Fornitore<input name="fornitore" required /></label>
+          <label>Categoria
+            <select name="categoria"><option value="bolletta">Bolletta</option><option value="deposito">Deposito cauzionale</option><option value="altro">Altro</option></select>
+          </label>
+          <label>Periodo dal<input type="date" name="periodo_dal" required /></label>
+          <label>Periodo al<input type="date" name="periodo_al" required /></label>
+          <label>Importo €<input type="number" step="0.01" name="importo" required /></label>
+          <label><span id="consumo-label">Consumo</span><input type="number" step="0.001" name="consumo" value="0" /></label>
+          <label>Data emissione<input type="date" name="data_emissione" /></label>
+          <label>Oneri extra €<input type="number" step="0.01" name="oneri_extra" value="0" /></label>
+          <label>Bonus €<input type="number" step="0.01" name="bonus" value="0" /></label>
+          <label>Link PDF<input type="url" name="file_url" placeholder="https://onedrive.live.com/…" /></label>
+        </div>
+        <label>Note<textarea name="note" rows="2"></textarea></label>
+        <p class="muted small-text">Oneri extra: voci non legate ai consumi (rate, depositi, volture). Non entrano nel costo per unità.</p>
+        <p id="dialog-message" class="form-message" role="status"></p>
+        <div class="dialog-actions">
+          <button type="button" id="delete-btn" class="btn danger ghost">Elimina</button>
+          <span class="spacer"></span>
+          <button type="button" id="cancel-btn" class="btn ghost">Annulla</button>
+          <button type="submit" class="btn primary">Salva</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="supabase-config.js"></script>
+    <script src="app.js?v=20261102-1"></script>
+  </body>
+</html>

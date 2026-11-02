@@ -1,7 +1,7 @@
 # Casa
 
 ## Cos'è
-Webapp in italiano per i conti di casa e famiglia, a sezioni. Sezione attiva: **Forniture** (bollette di luce, gas e acqua) con riepilogo dell'intero periodo dal 2022, spesa per anno, confronto mese per mese tra anni, costo per unità, elenco bollette con link ai PDF su OneDrive e finestra per aggiungere/modificare/eliminare; scheda **Fotovoltaico** (impianto da ottobre 2022) con produzione, autoconsumo, venduti, copertura dei consumi e bonifici GSE. Sezioni "Spese fisse" e "Budget" presenti nel menu ma ancora vuote.
+Webapp in italiano per i conti di casa e famiglia, a sezioni. Sezione attiva: **Forniture** (bollette di luce, gas e acqua) con riepilogo dell'intero periodo dal 2022, spesa per anno, confronto mese per mese tra anni, costo per unità, elenco bollette con link ai PDF su OneDrive e finestra per aggiungere/modificare/eliminare; scheda **Fotovoltaico** (impianto da ottobre 2022) con produzione, autoconsumo, venduti, copertura dei consumi e bonifici GSE. Sezione **Condominio**: pagamenti delle quote condominiali (ordinarie e straordinarie) con riepilogo, griglia dei mesi pagati / da pagare, versato per anno ed elenco con finestra per aggiungere/modificare/eliminare. Sezioni "Spese fisse" e "Budget" presenti nel menu ma ancora vuote.
 
 ## Stack
 - HTML, CSS e JavaScript puro. Nessun build, nessun package manager.
@@ -20,7 +20,8 @@ Webapp in italiano per i conti di casa e famiglia, a sezioni. Sezione attiva: **
 - Tabella `casa_bollette`: una riga per bolletta. `importo` è il costo della bolletta (negativo se a credito, già al netto dei crediti riportati dalle bollette precedenti). `oneri_extra` sono voci non legate ai consumi (rate, depositi, volture) e `bonus` i bonus sociali: il costo per unità usa `importo - oneri_extra + bonus`. `categoria` = bolletta / deposito / altro. Unicità su `(user_id, tipo, codice, categoria)`.
 - Tabella `casa_fotovoltaico`: una riga per bimestre, `codice` uguale al nome della bolletta luce dello stesso bimestre. `kwh_prodotti` e `kwh_immessi` (i "venduti"; null se non disponibile, come set 2022 – feb 2023). Calcolati nell'app: autoconsumo = prodotti − immessi; consumo totale = consumo della bolletta luce (prelievo) + autoconsumo. Dati iniziali dal foglio LUCE di OneDrive `Spese Casa.xlsx`.
 - Tabella `casa_gse_bonifici`: un accredito per riga (`data_accredito`, `importo`). Le prime 4 date sono indicative (fine del bimestre in cui erano annotate). La spesa luce netta = bollette luce dal primo bimestre FV − bonifici GSE.
-- Le tabelle del fotovoltaico le compila l'utente dall'app; l'attività pianificata giornaliera scrive solo in `casa_bollette`.
+- Tabella `casa_condominio`: un pagamento per riga (`data_pagamento`, `importo`, `tipo` ordinaria/straordinaria, `causale`). Le quote ordinarie hanno `competenza_dal`/`competenza_al` (primo giorno del primo e dell'ultimo mese coperto); le straordinarie no. L'app ricava i mesi coperti, la quota mensile attuale (ultima quota ordinaria ÷ mesi) e le quote arretrate (mesi senza quota dal primo mese fino al mese precedente a oggi). Dati iniziali dal foglio "Concorde" di `Spese Casa.xlsx` (36 righe, 6.071,45 €); due righe miste sono state divise: 13/08/2022 = 390 € quote gen-giu 2022 + 55,45 € conguaglio bilancio 2021; 27/09/2024 = 65 € quota luglio 2024 + 71 € riparazione citofono.
+- Le tabelle del fotovoltaico le compila l'utente dall'app; l'attività pianificata giornaliera scrive solo in `casa_bollette`. Anche `casa_condominio` si compila solo dall'app.
 - RLS attiva, una policy per il proprietario, `revoke all` ad `anon`, `grant` ad `authenticated`.
 
 ## Bollette e OneDrive

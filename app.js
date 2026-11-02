@@ -22,6 +22,7 @@ let sb = null;
 let bollette = [];
 let fv = [];      // casa_fotovoltaico
 let gse = [];     // casa_gse_bonifici
+let cond = [];    // casa_condominio
 let fvDisponibile = false; // false finché le tabelle del fotovoltaico non esistono
 let state = { tipo: 'tutte', confrontoTipo: 'luce', misura: 'spesa', anno: null }; // anno null = ultimo anno disponibile
 const charts = {};
@@ -71,10 +72,11 @@ $('#logout-btn').addEventListener('click', async () => { await sb.auth.signOut()
 /* ---------- Dati ---------- */
 
 async function caricaDati() {
-  const [b, f, g] = await Promise.all([
+  const [b, f, g, c] = await Promise.all([
     sb.from('casa_bollette').select('*').order('periodo_al', { ascending: true }),
     sb.from('casa_fotovoltaico').select('*').order('periodo_al', { ascending: true }),
     sb.from('casa_gse_bonifici').select('*').order('data_accredito', { ascending: true }),
+    sb.from('casa_condominio').select('*').order('data_pagamento', { ascending: true }),
   ]);
   if (b.error) { alert('Non riesco a leggere le bollette: ' + b.error.message); return; }
   bollette = b.data.map(r => ({
@@ -85,6 +87,8 @@ async function caricaDati() {
   fvDisponibile = !f.error && !g.error;
   fv = (f.data || []).map(r => ({ ...r, kwh_prodotti: Number(r.kwh_prodotti), kwh_immessi: r.kwh_immessi == null ? null : Number(r.kwh_immessi) }));
   gse = (g.data || []).map(r => ({ ...r, importo: Number(r.importo) }));
+  if (c.error) console.warn('Condominio non disponibile:', c.error.message);
+  cond = (c.data || []).map(r => ({ ...r, importo: Number(r.importo) }));
   render();
 }
 
@@ -166,6 +170,7 @@ function render() {
   renderTipi(anni);
   renderFotovoltaico();
   renderLista();
+  renderCondominio();
 }
 
 function renderPeriodo() {
@@ -435,6 +440,7 @@ $('#anno-filter').addEventListener('change', e => { state.anno = e.target.value;
 $$('.section-tab').forEach(tab => tab.addEventListener('click', () => {
   $$('.section-tab').forEach(t => t.classList.toggle('active', t === tab));
   $$('.section').forEach(s => s.hidden = s.id !== 'section-' + tab.dataset.section);
+  if (tab.dataset.section === 'condominio' && currentUser) renderCondominio();
 }));
 
 // Ridisegna i grafici quando cambia il tema chiaro/scuro
@@ -553,6 +559,221 @@ $('#gse-add-btn').addEventListener('click', () => apriGse());
 $('#fv-card').addEventListener('click', e => {
   const f = e.target.closest('[data-fv]')?.dataset.fv; if (f) apriFv(fv.find(r => r.id === f));
   const g = e.target.closest('[data-gse]')?.dataset.gse; if (g) apriGse(gse.find(r => r.id === g));
+});
+
+/* ---------- Condominio ---------- */
+
+const oggiISO = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+const ym = s => s ? s.slice(0, 7) : null;                       // 'YYYY-MM-DD' → 'YYYY-MM'
+const ymAdd = (k, n) => { const [y, m] = k.split('-').map(Number); const t = y * 12 + m - 1 + n; return `${Math.floor(t / 12)}-${String(t % 12 + 1).padStart(2, '0')}`; };
+const ymDiff = (a, b) => { const [ya, ma] = a.split('-').map(Number), [yb, mb] = b.split('-').map(Number); return (yb - ya) * 12 + mb - ma; };
+const ymNome = k => { const [y, m] = k.split('-').map(Number); return `${MESI_LUNGHI[m - 1]} ${y}`; };
+const competenza = r => {
+  if (!r.competenza_dal) return '';
+  const a = ym(r.competenza_dal), b = ym(r.competenza_al || r.competenza_dal);
+  return a === b ? ymNome(a) : `${ymNome(a)} – ${ymNome(b)}`;
+};
+
+// Mesi coperti dalle quote ordinarie, mese → pagamento
+function condCoperti() {
+  const map = {};
+  for (const r of cond) {
+    if (r.tipo !== 'ordinaria' || !r.competenza_dal) continue;
+    const fine = ym(r.competenza_al || r.competenza_dal);
+    for (let k = ym(r.competenza_dal); k <= fine; k = ymAdd(k, 1)) map[k] = r;
+  }
+  return map;
+}
+// Quota mensile attuale: dall'ultima quota ordinaria pagata
+function condQuota() {
+  const r = [...cond].filter(x => x.tipo === 'ordinaria' && x.competenza_dal).sort((a, b) => a.competenza_al.localeCompare(b.competenza_al)).at(-1);
+  if (!r) return null;
+  return Math.round(r.importo / (ymDiff(ym(r.competenza_dal), ym(r.competenza_al)) + 1) * 100) / 100;
+}
+function condStato() {
+  const coperti = condCoperti();
+  const mesi = Object.keys(coperti).sort();
+  const oggi = ym(oggiISO());
+  const dovuti = [];
+  if (mesi.length) for (let k = mesi[0]; k < oggi; k = ymAdd(k, 1)) if (!coperti[k]) dovuti.push(k);
+  return { coperti, primo: mesi[0], ultimo: mesi.at(-1), oggi, dovuti, quota: condQuota() };
+}
+
+let condAnno = null;
+function renderCondominio() {
+  const st = condStato();
+  const ord = cond.filter(r => r.tipo === 'ordinaria'), str = cond.filter(r => r.tipo === 'straordinaria');
+  const somma = l => l.reduce((s, r) => s + r.importo, 0);
+  const totale = somma(cond);
+  $('#cond-period').textContent = cond.length ? `Pagamenti da ${meseAnno(cond[0].data_pagamento)} a ${meseAnno(cond.at(-1).data_pagamento)}` : 'Nessun pagamento';
+  const nDov = st.dovuti.length;
+  $('#cond-kpis').innerHTML = `
+    <div class="kpi"><div class="label">Versato in totale</div><div class="value">${eur0.format(totale)}</div><div class="sub">${cond.length} pagamenti</div></div>
+    <div class="kpi"><div class="label"><i class="dot" style="background:var(--ord)"></i>Quote ordinarie</div><div class="value">${eur0.format(somma(ord))}</div><div class="sub">${st.quota != null ? `quota attuale ${eur.format(st.quota)} al mese` : '–'}</div></div>
+    <div class="kpi"><div class="label"><i class="dot" style="background:var(--str)"></i>Straordinarie</div><div class="value">${eur0.format(somma(str))}</div><div class="sub">${str.length} ${str.length === 1 ? 'voce' : 'voci'}</div></div>
+    <div class="kpi ${nDov ? 'attenzione' : ''}"><div class="label">Quote da pagare</div><div class="value">${nDov ? `${nDov} · ${eur0.format(nDov * (st.quota || 0))}` : 'In regola'}</div><div class="sub">${st.ultimo ? `ultima pagata: ${ymNome(st.ultimo)}` : ''}</div></div>`;
+
+  // Griglia dei mesi
+  const g = $('#cond-griglia');
+  if (!st.primo) { g.innerHTML = '<p class="muted">Nessuna quota ordinaria.</p>'; }
+  else {
+    const y0 = Number(st.primo.slice(0, 4)), y1 = Math.max(Number(st.oggi.slice(0, 4)), Number(st.ultimo.slice(0, 4)));
+    let h = '<span></span>' + MESI.map(m => `<span class="h">${m[0]}</span>`).join('');
+    for (let y = y1; y >= y0; y--) {
+      h += `<span class="y">${y}</span>`;
+      for (let m = 1; m <= 12; m++) {
+        const k = `${y}-${String(m).padStart(2, '0')}`, r = st.coperti[k];
+        const cls = r ? 'pagata' : (k >= st.primo && k < st.oggi ? 'dovuta' : '');
+        const info = r ? `${ymNome(k)}: pagata il ${fmtData(r.data_pagamento)}` : cls ? `${ymNome(k)}: da pagare` : `${ymNome(k)}: non ancora dovuta`;
+        h += `<span class="m ${cls}" title="${info}" data-info="${info}"></span>`;
+      }
+    }
+    g.innerHTML = h;
+  }
+
+  // Grafico per anno di pagamento
+  const perY = {};
+  for (const r of cond) { const y = r.data_pagamento.slice(0, 4); const a = perY[y] ??= { ordinaria: 0, straordinaria: 0 }; a[r.tipo] += r.importo; }
+  const ys = Object.keys(perY).sort();
+  const opts = baseOptions();
+  opts.scales.x.stacked = true; opts.scales.y.stacked = true;
+  opts.scales.y.ticks.callback = v => eur0.format(v);
+  opts.plugins.tooltip.callbacks = {
+    label: c => ` ${c.dataset.label}: ${eur.format(c.parsed.y)}`,
+    footer: items => `Totale: ${eur.format(items.reduce((s, i) => s + i.parsed.y, 0))}`,
+  };
+  disegna('chart-cond', {
+    type: 'bar',
+    data: { labels: ys, datasets: [
+      { label: 'Ordinarie', data: ys.map(y => perY[y].ordinaria), backgroundColor: css('--ord'), borderRadius: 4, borderSkipped: 'bottom', maxBarThickness: 56 },
+      { label: 'Straordinarie', data: ys.map(y => perY[y].straordinaria), backgroundColor: css('--str'), borderColor: css('--surface'), borderWidth: { top: 2 }, borderRadius: 4, borderSkipped: 'bottom', maxBarThickness: 56 },
+    ] },
+    options: opts,
+  });
+
+  // Elenco
+  const anni = [...new Set(cond.map(r => r.data_pagamento.slice(0, 4)))].sort().reverse();
+  if (condAnno === null || (condAnno !== 'tutti' && !anni.includes(condAnno))) condAnno = 'tutti';
+  $('#cond-anno').innerHTML = `<option value="tutti">Tutti gli anni</option>` + anni.map(y => `<option value="${y}" ${condAnno === y ? 'selected' : ''}>${y}</option>`).join('');
+  const vis = cond.filter(r => condAnno === 'tutti' || r.data_pagamento.startsWith(condAnno))
+    .sort((a, b) => b.data_pagamento.localeCompare(a.data_pagamento) || a.tipo.localeCompare(b.tipo));
+  $('#cond-lista').innerHTML = vis.length ? vis.map(r => `
+    <div class="riga riga-cond">
+      <i class="dot ${r.tipo}" title="${r.tipo === 'ordinaria' ? 'Ordinaria' : 'Straordinaria'}"></i>
+      <div class="data">${fmtData(r.data_pagamento)}</div>
+      <div class="periodo"><div>${esc(r.causale || (r.tipo === 'ordinaria' ? 'Quota ordinaria' : 'Spesa straordinaria'))}</div>${r.tipo === 'straordinaria' ? '<div class="competenza">Straordinaria</div>' : `<div class="competenza">${competenza(r)}</div>`}</div>
+      <div class="num importo">${eur.format(r.importo)}</div>
+      <div class="azioni"><button class="icon-btn" data-cond="${r.id}">Modifica</button></div>
+    </div>`).join('') : '<p class="muted">Nessun pagamento.</p>';
+}
+
+$('#cond-anno').addEventListener('change', e => { condAnno = e.target.value; renderCondominio(); });
+$('#cond-griglia').addEventListener('click', e => {
+  const i = e.target.closest('[data-info]')?.dataset.info;
+  if (i) $('#cond-griglia-info').textContent = i.charAt(0).toUpperCase() + i.slice(1) + '.';
+});
+
+/* Finestra pagamento condominio */
+const cDlg = $('#cond-dialog'), cForm = $('#cond-form');
+let cId = null, cAutoImporto = false, cAutoCausale = false;
+
+function cSetTipo(tipo) {
+  cForm.elements.tipo.value = tipo;
+  $$('#cond-tipo button').forEach(b => b.classList.toggle('on', b.dataset.tipo === tipo));
+  $$('.solo-ord', cForm).forEach(el => el.hidden = tipo !== 'ordinaria');
+  cForm.elements.competenza_dal.required = cForm.elements.competenza_al.required = tipo === 'ordinaria';
+  cAggiorna();
+}
+// Per le quote nuove: importo e causale seguono i mesi scelti, finché non li modifichi a mano
+function cAggiorna() {
+  const f = cForm.elements, q = condQuota();
+  const dal = f.competenza_dal.value, al = f.competenza_al.value;
+  const ok = /^\d{4}-\d{2}$/.test(dal) && /^\d{4}-\d{2}$/.test(al) && al >= dal;
+  const n = ok ? ymDiff(dal, al) + 1 : 0;
+  if (f.tipo.value === 'ordinaria' && ok) {
+    if (cAutoImporto && q) f.importo.value = (n * q).toFixed(2);
+    if (cAutoCausale) f.causale.value = n === 1 ? `Quota ordinaria ${ymNome(dal)}` : `Quote ordinarie ${ymNome(dal)} – ${ymNome(al)}`;
+  }
+  $('#cond-hint').textContent = f.tipo.value === 'ordinaria' && ok && q ? `${n} ${n === 1 ? 'mese' : 'mesi'} × ${eur.format(q)} = ${eur.format(n * q)}` : '';
+}
+
+function apriCond(r = null) {
+  cId = r?.id || null; cForm.reset();
+  $('#cond-message').textContent = ''; $('#cond-message').classList.remove('error');
+  $('#cond-delete-btn').hidden = !r;
+  cDlg.querySelector('h2').textContent = r ? 'Modifica pagamento' : 'Nuovo pagamento';
+  const f = cForm.elements;
+  cAutoImporto = cAutoCausale = !r;
+  if (r) {
+    f.data_pagamento.value = r.data_pagamento; f.importo.value = r.importo; f.causale.value = r.causale || '';
+    f.competenza_dal.value = ym(r.competenza_dal) || ''; f.competenza_al.value = ym(r.competenza_al) || '';
+    cSetTipo(r.tipo);
+  } else {
+    const st = condStato();
+    const prossimo = st.ultimo ? ymAdd(st.ultimo, 1) : ym(oggiISO());
+    f.data_pagamento.value = oggiISO();
+    f.competenza_dal.value = f.competenza_al.value = prossimo;
+    cSetTipo('ordinaria');
+  }
+  cDlg.showModal();
+}
+
+$('#cond-tipo').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.dataset.tipo === 'straordinaria' && cAutoCausale) { cForm.elements.causale.value = ''; cForm.elements.importo.value = ''; }
+  cSetTipo(b.dataset.tipo);
+});
+cForm.elements.competenza_dal.addEventListener('change', e => {
+  const al = cForm.elements.competenza_al;
+  if (!al.value || al.value < e.target.value) al.value = e.target.value;
+  cAggiorna();
+});
+cForm.elements.competenza_al.addEventListener('change', cAggiorna);
+cForm.elements.importo.addEventListener('input', () => { cAutoImporto = false; });
+cForm.elements.causale.addEventListener('input', () => { cAutoCausale = false; });
+cDlg.querySelector('[data-close]').addEventListener('click', () => cDlg.close());
+$('#cond-add-btn').addEventListener('click', () => apriCond());
+$('#cond-lista').addEventListener('click', e => {
+  const id = e.target.closest('[data-cond]')?.dataset.cond;
+  if (id) apriCond(cond.find(r => r.id === id));
+});
+
+cForm.addEventListener('submit', async e => {
+  e.preventDefault();
+  const f = cForm.elements, msg = $('#cond-message');
+  const err = t => { msg.textContent = t; msg.classList.add('error'); };
+  const ord = f.tipo.value === 'ordinaria';
+  const dal = f.competenza_dal.value, al = f.competenza_al.value;
+  if (ord && !(/^\d{4}-\d{2}$/.test(dal) && /^\d{4}-\d{2}$/.test(al))) return err('Indica i mesi coperti nel formato AAAA-MM.');
+  if (ord && al < dal) return err('Il mese finale è prima di quello iniziale.');
+  const r = {
+    tipo: f.tipo.value,
+    data_pagamento: f.data_pagamento.value,
+    importo: Number(f.importo.value),
+    competenza_dal: ord ? dal + '-01' : null,
+    competenza_al: ord ? al + '-01' : null,
+    causale: f.causale.value.trim() || null,
+  };
+  if (ord) {
+    const coperti = condCoperti();
+    for (let k = dal; k <= al; k = ymAdd(k, 1)) {
+      const g = coperti[k];
+      if (g && g.id !== cId && !confirm(`${ymNome(k)} risulta già pagato il ${fmtData(g.data_pagamento)}. Salvare comunque?`)) return;
+      if (g && g.id !== cId) break;
+    }
+  }
+  msg.textContent = 'Salvataggio…'; msg.classList.remove('error');
+  const { error } = cId ? await sb.from('casa_condominio').update(r).eq('id', cId) : await sb.from('casa_condominio').insert(r);
+  if (error) return err('Errore: ' + error.message);
+  cDlg.close(); await caricaDati();
+});
+
+$('#cond-delete-btn').addEventListener('click', async () => {
+  const r = cond.find(x => x.id === cId);
+  if (!r || !confirm(`Eliminare il pagamento del ${fmtData(r.data_pagamento)} (${eur.format(r.importo)})?`)) return;
+  const { error } = await sb.from('casa_condominio').delete().eq('id', cId);
+  if (error) { $('#cond-message').textContent = 'Errore: ' + error.message; return; }
+  cDlg.close(); await caricaDati();
 });
 
 init();

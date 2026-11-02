@@ -16,6 +16,9 @@
   --acqua: #1baf7a;
   --fv: #eda100;
   --rete: #85837b;
+  --ord: #1f8a66;
+  --str: #7a55c4;
+  --da-pagare: #e8a33a;
   --year-1: #c9c7bf;
   --year-2: #a9a79e;
   --year-3: #85837b;
@@ -44,6 +47,9 @@
     --acqua: #199e70;
     --fv: #c98500;
     --rete: #73726b;
+    --ord: #3fa57f;
+    --str: #9a7ae0;
+    --da-pagare: #c98a26;
     --year-1: #3d3d39;
     --year-2: #55544f;
     --year-3: #73726b;
@@ -56,6 +62,7 @@
   --bg: #161615; --surface: #1e1e1d; --surface-2: #272725; --border: #33332f;
   --text: #f0efec; --text-2: #c3c2b7; --text-3: #8f8e86; --accent: #5fb898; --accent-ink: #0f1f1a;
   --danger: #e66767; --grid: #2c2c29; --luce: #d95926; --gas: #3987e5; --acqua: #199e70; --fv: #c98500; --rete: #73726b;
+  --ord: #3fa57f; --str: #9a7ae0; --da-pagare: #c98a26;
   --year-1: #3d3d39; --year-2: #55544f; --year-3: #73726b; --year-4: #9a998f; --shadow: none;
 }
 
@@ -210,6 +217,19 @@ dialog::backdrop { background: rgb(0 0 0 / 0.35); }
 .dialog-actions { display: flex; gap: 8px; align-items: center; }
 .spacer { flex: 1; }
 
+
+/* Condominio */
+.mesi-griglia { display: grid; grid-template-columns: 44px repeat(12, minmax(0, 1fr)); gap: 4px; font-size: 12px; font-variant-numeric: tabular-nums; }
+.mesi-griglia .h { color: var(--text-3); font-weight: 600; text-align: center; }
+.mesi-griglia .y { color: var(--text-2); font-weight: 600; align-self: center; }
+.mesi-griglia .m { height: 26px; border-radius: 6px; background: var(--surface-2); }
+.mesi-griglia .m.pagata { background: var(--ord); }
+.mesi-griglia .m.dovuta { background: var(--da-pagare); }
+.riga-cond { grid-template-columns: 10px 0.8fr 2.4fr 0.9fr auto; }
+.riga .dot.ordinaria { background: var(--ord); } .riga .dot.straordinaria { background: var(--str); }
+.riga .competenza { font-size: 13px; color: var(--text-3); }
+.kpi.attenzione .value { color: var(--da-pagare); }
+
 @media (max-width: 900px) {
   .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .tipi { grid-template-columns: 1fr; }
@@ -236,4 +256,10 @@ dialog::backdrop { background: rgb(0 0 0 / 0.35); }
   .kpis-fv { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .fv-cols { grid-template-columns: 1fr; }
   .grid2 { grid-template-columns: 1fr; }
+  .mesi-griglia { grid-template-columns: 34px repeat(12, minmax(0, 1fr)); gap: 3px; font-size: 11px; }
+  .mesi-griglia .m { height: 22px; border-radius: 4px; }
+  .riga-cond { grid-template-columns: 10px 1fr auto; }
+  .riga-cond .data { grid-column: 2; }
+  .riga-cond .periodo { grid-column: 2 / 3; }
+  .riga-cond .num.importo { grid-row: 1; grid-column: 3; }
 }

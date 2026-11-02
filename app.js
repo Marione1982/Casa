@@ -49,6 +49,7 @@ async function handleSession(session) {
   $('#app-view').hidden = false;
   await caricaDati();
   $('#loading').hidden = true;
+  aggiornaFox();
 }
 
 function showAuth(msg, isError = false) {
@@ -566,6 +567,32 @@ $('#fv-card').addEventListener('click', e => {
   const f = e.target.closest('[data-fv]')?.dataset.fv; if (f) apriFv(fv.find(r => r.id === f));
   const g = e.target.closest('[data-gse]')?.dataset.gse; if (g) apriGse(gse.find(r => r.id === g));
 });
+
+/* ---------- Fox ESS: aggiornamento del fotovoltaico ---------- */
+
+// Chiede alla funzione Supabase i dati Fox ESS dell'anno e aggiorna i bimestri.
+// In automatico al massimo ogni 6 ore per dispositivo; il pulsante forza l'aggiornamento.
+const FOX_OGNI = 6 * 3600 * 1000;
+async function aggiornaFox(manuale = false) {
+  if (!fvDisponibile || !currentUser) return;
+  let ultimo = 0;
+  try { ultimo = Number(localStorage.getItem('casa-fox-ultimo')) || 0; } catch {}
+  if (!manuale && Date.now() - ultimo < FOX_OGNI) return;
+  const btn = $('#fox-btn');
+  if (manuale) { btn.disabled = true; btn.textContent = 'Aggiorno…'; }
+  try {
+    const { data, error } = await sb.functions.invoke('casa-foxess-sync', { method: 'POST' });
+    if (error || !data?.ok) throw new Error(data?.errore || error?.message || 'errore');
+    try { localStorage.setItem('casa-fox-ultimo', String(Date.now())); } catch {}
+    await caricaDati();
+    $('#fox-stato').textContent = `Aggiornato da Fox ESS alle ${new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}`;
+  } catch (e) {
+    $('#fox-stato').textContent = 'Aggiornamento da Fox ESS non riuscito' + (manuale ? `: ${e.message}` : '');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Aggiorna da Fox ESS';
+  }
+}
+$('#fox-btn').addEventListener('click', () => aggiornaFox(true));
 
 /* ---------- Condominio ---------- */
 

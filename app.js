@@ -85,7 +85,7 @@ async function caricaDati() {
     oneri_extra: Number(r.oneri_extra), bonus: Number(r.bonus),
   }));
   fvDisponibile = !f.error && !g.error;
-  fv = (f.data || []).map(r => ({ ...r, kwh_prodotti: Number(r.kwh_prodotti), kwh_immessi: r.kwh_immessi == null ? null : Number(r.kwh_immessi) }));
+  fv = (f.data || []).map(r => ({ ...r, kwh_prodotti: Number(r.kwh_prodotti), kwh_netti: r.kwh_netti == null ? null : Number(r.kwh_netti), kwh_immessi: r.kwh_immessi == null ? null : Number(r.kwh_immessi) }));
   gse = (g.data || []).map(r => ({ ...r, importo: Number(r.importo) }));
   if (c.error) console.warn('Condominio non disponibile:', c.error.message);
   cond = (c.data || []).map(r => ({ ...r, importo: Number(r.importo) }));
@@ -98,8 +98,10 @@ function fvBimestri() {
     const bol = bollette.find(b => b.tipo === 'luce' && b.categoria === 'bolletta' && b.codice === r.codice);
     const prelievo = bol ? bol.consumo : null;
     const venduti = r.kwh_immessi ?? 0;
-    const autoconsumo = Math.max(0, r.kwh_prodotti - venduti);
-    return { ...r, prelievo, autoconsumo, venduti, consumoTotale: (prelievo ?? 0) + autoconsumo };
+    const netti = r.kwh_netti ?? r.kwh_prodotti;           // uscita inverter; se manca, uguale al lordo
+    const perdite = r.kwh_netti == null ? 0 : Math.max(0, r.kwh_prodotti - r.kwh_netti);
+    const autoconsumo = Math.max(0, netti - venduti);
+    return { ...r, netti, perdite, prelievo, autoconsumo, venduti, consumoTotale: (prelievo ?? 0) + autoconsumo };
   });
 }
 const NOMI_BIM = ['Gen-Feb', 'Mar-Apr', 'Mag-Giu', 'Lug-Ago', 'Set-Ott', 'Nov-Dic'];
@@ -330,6 +332,9 @@ function renderFotovoltaico() {
   if (card.hidden) return;
   const bim = fvBimestri();
   const prod = bim.reduce((s, r) => s + r.kwh_prodotti, 0);
+  const netti = bim.reduce((s, r) => s + r.netti, 0);
+  const conPerdite = bim.filter(r => r.perdite > 0);       // bimestri con il dato dei pannelli (da mar 2024)
+  const lordoP = conPerdite.reduce((s, r) => s + r.kwh_prodotti, 0), perdP = conPerdite.reduce((s, r) => s + r.perdite, 0);
   const auto = bim.reduce((s, r) => s + r.autoconsumo, 0);
   const vend = bim.reduce((s, r) => s + r.venduti, 0);
   const tot = bim.reduce((s, r) => s + r.consumoTotale, 0);
@@ -338,9 +343,10 @@ function renderFotovoltaico() {
   const speseLuce = bollette.filter(b => b.tipo === 'luce' && primo && b.periodo_al >= primo).reduce((s, b) => s + b.importo, 0);
   const kwh = v => `${num0.format(v)} kWh`;
   $('#fv-kpis').innerHTML = bim.length ? `
-    <div class="kpi"><div class="label">Prodotti</div><div class="value">${kwh(prod)}</div><div class="sub">dal ${primo ? meseAnno(primo) : ''}</div></div>
-    <div class="kpi"><div class="label">Autoconsumati</div><div class="value">${kwh(auto)}</div><div class="sub">${num0.format(auto / prod * 100)}% della produzione</div></div>
-    <div class="kpi"><div class="label">Venduti alla rete</div><div class="value">${kwh(vend)}</div><div class="sub">${num0.format(vend / prod * 100)}% della produzione</div></div>
+    <div class="kpi"><div class="label">Prodotti (lordo)</div><div class="value">${kwh(prod)}</div><div class="sub">netti ${kwh(netti)} · dal ${primo ? meseAnno(primo) : ''}</div></div>
+    <div class="kpi"><div class="label">Perdite inverter e batteria</div><div class="value">${lordoP ? num1.format(perdP / lordoP * 100) + '%' : '–'}</div><div class="sub">${lordoP ? `${kwh(perdP)} da ${meseAnno(conPerdite[0].periodo_dal)}` : 'dato dei pannelli non disponibile'}</div></div>
+    <div class="kpi"><div class="label">Autoconsumati</div><div class="value">${kwh(auto)}</div><div class="sub">${num0.format(auto / netti * 100)}% dei netti</div></div>
+    <div class="kpi"><div class="label">Venduti alla rete</div><div class="value">${kwh(vend)}</div><div class="sub">${num0.format(vend / netti * 100)}% dei netti</div></div>
     <div class="kpi"><div class="label">Coperto dal fotovoltaico</div><div class="value">${num0.format(auto / tot * 100)}%</div><div class="sub">del consumo totale (${kwh(tot)})</div></div>
     <div class="kpi"><div class="label">Bonifici GSE</div><div class="value">${eur0.format(bonifici)}</div><div class="sub">${gse.length} accrediti</div></div>
     <div class="kpi"><div class="label">Spesa luce netta</div><div class="value">${eur0.format(speseLuce - bonifici)}</div><div class="sub">bollette ${eur0.format(speseLuce)} − GSE</div></div>`
@@ -355,7 +361,7 @@ function renderFotovoltaico() {
     label: c => ` ${c.dataset.label}: ${kwh(c.parsed.y)}`,
     footer: items => {
       const r = bim[items[0].dataIndex];
-      return [`Consumo totale: ${kwh(r.consumoTotale)}`, r.kwh_immessi == null ? 'Venduti non disponibili' : `Venduti: ${kwh(r.venduti)}`, r.prelievo == null ? 'Bolletta luce non ancora inserita' : ''].filter(Boolean);
+      return [`Prodotti netti: ${kwh(r.netti)}${r.perdite ? ` (perdite ${kwh(r.perdite)})` : ''}`, `Consumo totale: ${kwh(r.consumoTotale)}`, r.kwh_immessi == null ? 'Venduti non disponibili' : `Venduti: ${kwh(r.venduti)}`, r.prelievo == null ? 'Bolletta luce non ancora inserita' : ''].filter(Boolean);
     },
   };
   disegna('chart-fv', {
@@ -363,26 +369,26 @@ function renderFotovoltaico() {
     data: {
       labels,
       datasets: [
-        { type: 'line', label: 'Prodotti', data: bim.map(r => r.kwh_prodotti), borderColor: css('--text-2'), backgroundColor: css('--text-2'), borderDash: [5, 4], borderWidth: 2, pointRadius: 0, pointHoverRadius: 4, tension: 0.3, stack: 'prod', order: 0 },
+        { type: 'line', label: 'Prodotti (lordo)', data: bim.map(r => r.kwh_prodotti), borderColor: css('--text-2'), backgroundColor: css('--text-2'), borderDash: [5, 4], borderWidth: 2, pointRadius: 0, pointHoverRadius: 4, tension: 0.3, stack: 'prod', order: 0 },
         { label: 'Dal fotovoltaico', data: bim.map(r => +r.autoconsumo.toFixed(1)), backgroundColor: css('--fv'), borderColor: css('--surface'), borderWidth: { top: 2 }, borderRadius: 4, borderSkipped: 'bottom', stack: 'cons', order: 2 },
         { label: 'Dalla rete', data: bim.map(r => r.prelievo ?? 0), backgroundColor: css('--rete'), borderRadius: 4, borderSkipped: 'bottom', stack: 'cons', order: 1 },
       ],
     },
     options: opts,
   });
-  $('#legend-fv').innerHTML = `<span><i style="background:var(--rete)"></i>Dalla rete</span><span><i style="background:var(--fv)"></i>Dal fotovoltaico</span><span><i class="line" style="background:var(--text-2)"></i>Prodotti</span>`;
+  $('#legend-fv').innerHTML = `<span><i style="background:var(--rete)"></i>Dalla rete</span><span><i style="background:var(--fv)"></i>Dal fotovoltaico</span><span><i class="line" style="background:var(--text-2)"></i>Prodotti (lordo)</span>`;
 
   // Riepilogo per anno (anno del bimestre)
   const perY = {};
   for (const r of bim) {
-    const y = r.codice.slice(0, 4); const a = perY[y] ??= { prod: 0, auto: 0, vend: 0, tot: 0, gse: 0 };
-    a.prod += r.kwh_prodotti; a.auto += r.autoconsumo; a.vend += r.venduti; a.tot += r.consumoTotale;
+    const y = r.codice.slice(0, 4); const a = perY[y] ??= { prod: 0, netti: 0, auto: 0, vend: 0, tot: 0, gse: 0 };
+    a.prod += r.kwh_prodotti; a.netti += r.netti; a.auto += r.autoconsumo; a.vend += r.venduti; a.tot += r.consumoTotale;
   }
-  for (const g of gse) { const y = g.data_accredito.slice(0, 4); (perY[y] ??= { prod: 0, auto: 0, vend: 0, tot: 0, gse: 0 }).gse += g.importo; }
-  $('#fv-anni').innerHTML = `<thead><tr><th>Anno</th><th>Prodotti</th><th>Autocons.</th><th>Venduti</th><th>Coperto</th><th>GSE</th></tr></thead><tbody>` +
-    Object.keys(perY).sort().map(y => { const a = perY[y]; return `<tr><td>${y}</td><td>${num0.format(a.prod)}</td><td>${num0.format(a.auto)}</td><td>${num0.format(a.vend)}</td><td>${a.tot ? num0.format(a.auto / a.tot * 100) + '%' : '–'}</td><td>${a.gse ? eur.format(a.gse) : '–'}</td></tr>`; }).join('') + '</tbody>';
+  for (const g of gse) { const y = g.data_accredito.slice(0, 4); (perY[y] ??= { prod: 0, netti: 0, auto: 0, vend: 0, tot: 0, gse: 0 }).gse += g.importo; }
+  $('#fv-anni').innerHTML = `<thead><tr><th>Anno</th><th>Lordo</th><th>Netti</th><th>Autocons.</th><th>Venduti</th><th>Coperto</th><th>GSE</th></tr></thead><tbody>` +
+    Object.keys(perY).sort().map(y => { const a = perY[y]; return `<tr><td>${y}</td><td>${num0.format(a.prod)}</td><td>${num0.format(a.netti)}</td><td>${num0.format(a.auto)}</td><td>${num0.format(a.vend)}</td><td>${a.tot ? num0.format(a.auto / a.tot * 100) + '%' : '–'}</td><td>${a.gse ? eur.format(a.gse) : '–'}</td></tr>`; }).join('') + '</tbody>';
 
-  $('#fv-lista').innerHTML = (bim.length ? '<div class="mini-riga mini-head"><span>Bimestre</span><span>kWh prodotti / venduti</span><span></span></div>' : '') + [...bim].reverse().map(r => `<div class="mini-riga"><div><span class="codice">${esc(r.codice)}</span> <small>${etichettaBimestre(r.codice)}${r.note ? ' · ' + esc(r.note) : ''}</small></div><div>${num0.format(r.kwh_prodotti)} / ${r.kwh_immessi == null ? '–' : num0.format(r.kwh_immessi)}</div><button class="icon-btn" data-fv="${r.id}">Modifica</button></div>`).join('') || '<p class="muted">Nessun bimestre.</p>';
+  $('#fv-lista').innerHTML = (bim.length ? '<div class="mini-riga mini-head"><span>Bimestre</span><span>kWh lordo / netti / venduti</span><span></span></div>' : '') + [...bim].reverse().map(r => `<div class="mini-riga"><div><span class="codice">${esc(r.codice)}</span> <small>${etichettaBimestre(r.codice)}${r.note ? ' · ' + esc(r.note) : ''}</small></div><div>${num0.format(r.kwh_prodotti)} / ${num0.format(r.netti)} / ${r.kwh_immessi == null ? '–' : num0.format(r.kwh_immessi)}</div><button class="icon-btn" data-fv="${r.id}">Modifica</button></div>`).join('') || '<p class="muted">Nessun bimestre.</p>';
   $('#gse-lista').innerHTML = (gse.length ? '<div class="mini-riga mini-head"><span>Data</span><span>Importo</span><span></span></div>' : '') + [...gse].reverse().map(g => `<div class="mini-riga"><div>${fmtData(g.data_accredito)}${g.note ? `<small>${esc(g.note)}</small>` : ''}</div><div>${eur.format(g.importo)}</div><button class="icon-btn" data-gse="${g.id}">Modifica</button></div>`).join('') || '<p class="muted">Nessun bonifico.</p>';
 }
 
@@ -413,7 +419,7 @@ function fvRiga(b) {
   if (b.tipo !== 'luce' || b.categoria !== 'bolletta') return '';
   const r = fv.find(x => x.codice === b.codice);
   if (!r) return '';
-  return `<div class="fv-riga"><i class="dot fv"></i>FV: prodotti ${num0.format(r.kwh_prodotti)} kWh · venduti ${r.kwh_immessi == null ? 'n.d.' : num0.format(r.kwh_immessi) + ' kWh'}</div>`;
+  return `<div class="fv-riga"><i class="dot fv"></i>FV: prodotti ${num0.format(r.kwh_prodotti)} kWh (netti ${num0.format(r.kwh_netti ?? r.kwh_prodotti)}) · venduti ${r.kwh_immessi == null ? 'n.d.' : num0.format(r.kwh_immessi) + ' kWh'}</div>`;
 }
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -533,7 +539,7 @@ function setupDialog({ dlgSel, formSel, table, campi, numerici, titolo, getRow, 
 
 const apriFv = setupDialog({
   dlgSel: '#fv-dialog', formSel: '#fv-form', table: 'casa_fotovoltaico', titolo: 'bimestre fotovoltaico',
-  campi: ['codice', 'periodo_dal', 'periodo_al', 'kwh_prodotti', 'kwh_immessi', 'note'], numerici: ['kwh_prodotti', 'kwh_immessi'],
+  campi: ['codice', 'periodo_dal', 'periodo_al', 'kwh_prodotti', 'kwh_netti', 'kwh_immessi', 'note'], numerici: ['kwh_prodotti', 'kwh_netti', 'kwh_immessi'],
   getRow: id => fv.find(r => r.id === id), msgSel: '#fv-message', delSel: '#fv-delete-btn',
   descr: r => `i dati del fotovoltaico ${r.codice}`,
   defaults: () => {

@@ -60,7 +60,8 @@ create table public.casa_fotovoltaico (
   codice        text not null,              -- stesso nome della bolletta luce del bimestre: 202608, ...
   periodo_dal   date not null,
   periodo_al    date not null,
-  kwh_prodotti  numeric(10,1) not null default 0,
+  kwh_prodotti  numeric(10,1) not null default 0, -- lordo: produzione dei pannelli (come app Fox ESS); fino a feb 2024 = uscita inverter
+  kwh_netti     numeric(10,1) check (kwh_netti is null or kwh_netti >= 0), -- netto: uscita inverter (dopo perdite di conversione e batteria)
   kwh_immessi   numeric(10,1),              -- "venduti"; null se il dato non è disponibile
   note          text,
   created_at    timestamptz not null default now(),

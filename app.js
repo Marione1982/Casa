@@ -225,7 +225,7 @@ function baseOptions() {
     plugins: {
       legend: { display: false },
       tooltip: {
-        backgroundColor: css('--surface'), titleColor: css('--text'), bodyColor: css('--text-2'),
+        backgroundColor: css('--surface'), titleColor: css('--text'), bodyColor: css('--text-2'), footerColor: css('--text'), footerMarginTop: 8,
         borderColor: css('--border'), borderWidth: 1, padding: 10, boxPadding: 4, usePointStyle: true,
       },
     },

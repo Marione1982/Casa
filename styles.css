@@ -272,6 +272,18 @@ dialog::backdrop { background: rgb(0 0 0 / 0.35); }
   .riga-cond .num.importo { grid-row: 1; grid-column: 3; }
 }
 
+/* Prossime bollette */
+.pross-lista { display: grid; }
+.pross-riga { display: grid; grid-template-columns: 10px 1fr auto; gap: 12px; align-items: center; padding: 10px 2px; border-bottom: 1px solid var(--grid); }
+.pross-riga:last-child { border-bottom: 0; }
+.pross-desc { min-width: 0; }
+.pross-date { font-size: 13px; color: var(--text-2); margin-top: 2px; }
+.pross-date .a-mano { color: var(--da-pagare); font-weight: 600; }
+.pross-importo { text-align: right; font-variant-numeric: tabular-nums; }
+.pross-importo span { font-size: 17px; font-weight: 700; }
+.pross-importo small { display: block; font-size: 12px; color: var(--text-3); white-space: nowrap; }
+.pross-riga .badge { margin-left: 4px; white-space: nowrap; }
+
 /* Movimenti */
 .filtro-attivo { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 8px 10px; border-radius: 10px; background: var(--surface-2); font-size: 14px; }
 .filtro-attivo strong { font-variant-numeric: tabular-nums; }

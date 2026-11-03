@@ -114,6 +114,7 @@ async function caricaMovimenti() {
   const { data: reg } = await sb.from('casa_regole_categorie').select('*');
   regoleUtente = reg || [];
   renderMovimenti();
+  if (typeof renderProssime === 'function') renderProssime();   // le date di addebito dipendono dai movimenti
 }
 
 const contaNeiTotali = m => m.tipo === 'normale';

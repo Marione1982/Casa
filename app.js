@@ -172,6 +172,7 @@ function render() {
   const anni = perAnno(mesi);
   renderPeriodo();
   renderKpi(mesi, anni);
+  if (typeof renderProssime === 'function') renderProssime();   // prossime.js
   renderAnni(anni);
   renderConfronto(mesi);
   renderTipi(anni);

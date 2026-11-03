@@ -272,7 +272,16 @@ dialog::backdrop { background: rgb(0 0 0 / 0.35); }
   .riga-cond .num.importo { grid-row: 1; grid-column: 3; }
 }
 
-/* Prossime bollette */
+/* Prossime bollette (riquadro espandibile) */
+.pross-card { gap: 0; }
+.pross-card[open] { gap: 12px; }
+.pross-summary { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.pross-summary::-webkit-details-marker { display: none; }
+.pross-summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 8px; }
+.pross-titolo { display: grid; gap: 2px; min-width: 0; }
+.pross-tot { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 18px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.chevron { width: 9px; height: 9px; border-right: 2px solid var(--text-3); border-bottom: 2px solid var(--text-3); transform: rotate(45deg) translateY(-3px); transition: transform 0.2s; }
+.pross-card[open] .chevron { transform: rotate(-135deg) translate(-2px, -2px); }
 .pross-lista { display: grid; }
 .pross-riga { display: grid; grid-template-columns: 10px 1fr auto; gap: 12px; align-items: center; padding: 10px 2px; border-bottom: 1px solid var(--grid); }
 .pross-riga:last-child { border-bottom: 0; }

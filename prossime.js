@@ -155,7 +155,9 @@ function renderProssime() {
   if (!righe.length) return;
   const oggi = oggiIso();
   const totale = righe.reduce((s, r) => s + tondo(r.stima), 0);
-  $('#prossime-tot').textContent = `circa ${eur0.format(totale)} in tutto`;
+  $('#prossime-tot').textContent = `~${eur0.format(totale)}`;
+  const prima = righe[0];   // ordinate per data di pagamento
+  $('#prossime-prossima').textContent = `Prossimo pagamento: ${NOMI[prima.tipo].toLowerCase()} ~${eur0.format(tondo(prima.stima))}, ${fmtGiorno(prima.dataPagamento)}`;
   box.innerHTML = righe.map(r => {
     const arrivo = r.dataArrivo < oggi ? 'in arrivo a giorni' : `arriva verso il ${fmtGiorno(r.dataArrivo)}`;
     const pagamento = r.automatico
@@ -167,7 +169,7 @@ function renderProssime() {
       <div class="pross-desc">
         <div><strong>${NOMI[r.tipo]}</strong> · ${nomePeriodo(r)}${r.inCorso ? ' <span class="badge">in corso</span>' : ''}</div>
         <div class="pross-date">${arrivo} · <span class="${r.automatico ? '' : 'a-mano'}">${pagamento}</span></div>
-        ${r.misurato != null ? `<div class="pross-inv">⚡ ${r.finora ? 'prelievo dalla rete finora' : 'prelievo dalla rete'}: ${num0.format(r.misurato)} kWh (inverter)</div>` : ''}
+        ${r.misurato != null ? `<div class="pross-inv">⚡ consumo dall’inverter${r.finora ? ' finora' : ''}: ${num0.format(r.misurato)} kWh</div>` : ''}
       </div>
       <div class="pross-importo"><span>~${eur0.format(tondo(r.stima))}</span>${forchetta}</div>
     </div>`;

@@ -92,6 +92,7 @@ async function caricaDati() {
   cond = (c.data || []).map(r => ({ ...r, importo: Number(r.importo) }));
   render();
   if (typeof caricaMovimenti === 'function') caricaMovimenti();   // sezione Movimenti (movimenti.js)
+  if (typeof caricaSpese === 'function') caricaSpese();           // sezione Spese fisse (spese.js)
 }
 
 // Bimestri del fotovoltaico arricchiti con il prelievo dalla bolletta luce dello stesso nome
@@ -459,6 +460,7 @@ $$('.section-tab').forEach(tab => tab.addEventListener('click', () => {
   $$('.section-tab').forEach(t => t.classList.toggle('active', t === tab));
   $$('.section').forEach(s => s.hidden = s.id !== 'section-' + tab.dataset.section);
   if (tab.dataset.section === 'condominio' && currentUser) renderCondominio();
+  if (tab.dataset.section === 'spese' && currentUser && typeof renderSpese === 'function') renderSpese();
 }));
 
 // Ridisegna i grafici quando cambia il tema chiaro/scuro

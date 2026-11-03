@@ -334,3 +334,29 @@ label.check input { width: auto; }
   .riga-mov .num { grid-column: 2; grid-row: 1; font-weight: 600; }
   .riga-mov .fonte { grid-column: 2; grid-row: 2; text-align: right; }
 }
+
+/* Spese fisse */
+.sf-mese-head { align-items: flex-start; }
+.sf-nav { display: flex; align-items: center; gap: 4px; }
+.sf-nav h2 { min-width: 9.5em; text-align: center; }
+.sf-nav .icon-btn { font-size: 20px; line-height: 1; padding: 4px 10px; }
+.sf-nav .icon-btn:disabled { opacity: 0.3; cursor: default; }
+.sf-mese-tot { text-align: right; font-weight: 700; font-size: 18px; font-variant-numeric: tabular-nums; }
+.sf-mese-tot small { display: block; font-size: 12.5px; font-weight: 500; color: var(--text-3); }
+.sf-mese-tot .manca, .sf-stato.manca { color: var(--danger); }
+.sf-riga[role="button"] { cursor: pointer; border-radius: 8px; }
+.sf-riga[role="button"]:hover { background: var(--surface-2); }
+.sf-riga[role="button"]:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.sf-stato { font-size: 12.5px; margin-top: 3px; font-weight: 600; color: var(--text-3); }
+.sf-stato.ok { color: var(--ord); }
+.sf-stato.ok::before { content: '✓ '; }
+.sf-stato.manca::before { content: '⚠ '; }
+.sf-stato.completa { color: var(--da-pagare); }
+.sf-gruppo { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-3); margin: 14px 0 2px; }
+.sf-gruppo:first-child { margin-top: 0; }
+.badge.da-completare { background: color-mix(in srgb, var(--da-pagare) 18%, transparent); color: var(--da-pagare); }
+@media (max-width: 600px) {
+  .sf-mese-head { flex-direction: column; align-items: stretch; }
+  .sf-nav h2 { min-width: 0; flex: 1; }
+  .sf-mese-tot { text-align: left; }
+}

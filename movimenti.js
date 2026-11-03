@@ -115,6 +115,7 @@ async function caricaMovimenti() {
   regoleUtente = reg || [];
   renderMovimenti();
   if (typeof renderProssime === 'function') renderProssime();   // le date di addebito dipendono dai movimenti
+  if (typeof renderSpese === 'function') renderSpese();         // le spese fisse si confrontano con i movimenti
 }
 
 const contaNeiTotali = m => m.tipo === 'normale';

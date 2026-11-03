@@ -91,7 +91,12 @@ const CATEGORIE_AMEX = [
 
 let movimenti = [];
 let regoleUtente = [];
-let movState = { fonte: 'tutte', anno: null, categoria: '', cerca: '', mostra: 100 };
+let movState = { fonte: 'tutte', anno: null, categoria: '', cerca: '', mostra: 100, mese: null, verso: null }; // mese+verso: colonna toccata nel grafico
+
+// Dettaglio di una colonna del grafico: solo i movimenti di quel mese e di quel verso (entrate o uscite) che contano nei totali
+const nelDettaglio = m => !movState.mese || (m.data.startsWith(movState.mese) && contaNeiTotali(m) && (movState.verso === 'e' ? m.importo > 0 : m.importo < 0));
+const nomeMese = k => `${MESI_LUNGHI[Number(k.slice(5)) - 1]} ${k.slice(0, 4)}`;
+function chiudiDettaglio() { movState.mese = movState.verso = null; movState.categoria = ''; movState.mostra = 100; renderMovimenti(); }
 
 /* ---------- Dati ---------- */
 
@@ -162,9 +167,20 @@ function renderMovimenti() {
     <div class="kpi"><div class="label">Differenza</div><div class="value">${entrate - uscite >= 0 ? '+' : '−'}${eur0.format(Math.abs(entrate - uscite))}</div><div class="sub">entrate − uscite</div></div>
     <div class="kpi"><div class="label">Uscite medie al mese</div><div class="value">${eur0.format(uscite / mesi)}</div><div class="sub">su ${mesi} ${mesi === 1 ? 'mese' : 'mesi'}</div></div>`;
 
+  if (movState.mese && !valide.some(m => m.data.startsWith(movState.mese))) movState.mese = movState.verso = null;
   renderGraficoMov(valide);
-  renderCategorie(valide, uscite);
+  renderCategorie(valide.filter(nelDettaglio));
   renderListaMov(lista);
+  renderFiltroDettaglio(valide);
+}
+
+function renderFiltroDettaglio(valide) {
+  const box = $$('[data-filtro]');
+  if (!movState.mese) { box.forEach(b => { b.hidden = true; b.innerHTML = ''; }); return; }
+  const tot = valide.filter(nelDettaglio).reduce((s, m) => s + Math.abs(m.importo), 0);
+  const html = `<span>${movState.verso === 'e' ? 'Entrate' : 'Uscite'} di <strong>${nomeMese(movState.mese)}</strong>: <strong>${eur.format(tot)}</strong></span>
+    <button type="button" class="btn small ghost" data-chiudi-dettaglio>Mostra tutto</button>`;
+  box.forEach(b => { b.hidden = false; b.innerHTML = html; });
 }
 
 function renderGraficoMov(valide) {
@@ -182,27 +198,44 @@ function renderGraficoMov(valide) {
     footer: items => { const s = perMese[ks[items[0].dataIndex]]; return `Differenza: ${s.e - s.u >= 0 ? '+' : '−'}${eur.format(Math.abs(s.e - s.u))}`; },
   };
   const etichetta = k => movState.anno === 'tutti' ? `${MESI[Number(k.slice(5)) - 1]} ${k.slice(2, 4)}` : MESI[Number(k.slice(5)) - 1];
+  // colonna scelta in evidenza, le altre più chiare
+  const colore = (v, verso) => ks.map(k => !movState.mese || (k === movState.mese && movState.verso === verso) ? css(v) : css(v) + '4d');
+  // tocco su una colonna: dettaglio di quel mese (entrate o uscite); di nuovo sulla stessa colonna: si chiude
+  opts.onClick = (evt, _el, chart) => {
+    let el = chart.getElementsAtEventForMode(evt, 'nearest', { intersect: true }, true)[0];
+    if (!el) el = chart.getElementsAtEventForMode(evt, 'index', { intersect: false }, true).find(e => e.datasetIndex === 1);
+    if (!el) return;
+    const k = ks[el.index], verso = el.datasetIndex === 0 ? 'e' : 'u';
+    if (movState.mese === k && movState.verso === verso) return chiudiDettaglio();
+    movState.mese = k; movState.verso = verso; movState.categoria = ''; movState.mostra = 100;
+    renderMovimenti();
+    $('#mov-cat-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+  opts.onHover = (evt, el) => { evt.native.target.style.cursor = el.length ? 'pointer' : 'default'; };
   disegna('chart-mov', {
     type: 'bar',
     data: {
       labels: ks.map(etichetta),
       datasets: [
-        { label: 'Entrate', data: ks.map(k => +perMese[k].e.toFixed(2)), backgroundColor: css('--entrate'), borderRadius: 4, borderSkipped: 'bottom', maxBarThickness: 28 },
-        { label: 'Uscite', data: ks.map(k => +perMese[k].u.toFixed(2)), backgroundColor: css('--uscite'), borderRadius: 4, borderSkipped: 'bottom', maxBarThickness: 28 },
+        { label: 'Entrate', data: ks.map(k => +perMese[k].e.toFixed(2)), backgroundColor: colore('--entrate', 'e'), borderRadius: 4, borderSkipped: 'bottom', maxBarThickness: 28 },
+        { label: 'Uscite', data: ks.map(k => +perMese[k].u.toFixed(2)), backgroundColor: colore('--uscite', 'u'), borderRadius: 4, borderSkipped: 'bottom', maxBarThickness: 28 },
       ],
     },
     options: opts,
   });
 }
 
-function renderCategorie(valide, uscite) {
+function renderCategorie(valide) {
+  const entrate = movState.verso === 'e';
   const perCat = {};
-  for (const m of valide) if (m.importo < 0) perCat[m.categoria || 'Altro'] = (perCat[m.categoria || 'Altro'] || 0) - m.importo;
+  for (const m of valide) if (entrate ? m.importo > 0 : m.importo < 0) perCat[m.categoria || 'Altro'] = (perCat[m.categoria || 'Altro'] || 0) + Math.abs(m.importo);
   const cats = Object.entries(perCat).sort((a, b) => b[1] - a[1]);
   const max = cats[0]?.[1] || 1;
+  const uscite = cats.reduce((s, [, v]) => s + v, 0);
+  $('#mov-cat-titolo').textContent = movState.mese ? `${entrate ? 'Entrate' : 'Uscite'} di ${nomeMese(movState.mese)}` : 'Uscite per categoria';
   $('#mov-cat-tot').textContent = uscite ? `${eur0.format(uscite)} in tutto` : '';
   $('#mov-categorie').innerHTML = cats.length ? cats.map(([c, v]) => `
-    <button type="button" class="cat-riga ${movState.categoria === c ? 'on' : ''}" data-cat="${esc(c)}">
+    <button type="button" class="cat-riga ${entrate ? 'entrata' : ''} ${movState.categoria === c ? 'on' : ''}" data-cat="${esc(c)}">
       <span>${esc(c)}</span>
       <span class="barra"><i style="width:${(v / max * 100).toFixed(1)}%"></i></span>
       <span class="num">${eur0.format(v)}<small>${num0.format(v / uscite * 100)}%</small></span>
@@ -213,9 +246,9 @@ function renderListaMov(lista) {
   const tutte = [...new Set([...CATEGORIE_USCITA, ...CATEGORIE_ENTRATA, ...movimenti.map(m => m.categoria).filter(Boolean)])];
   $('#mov-cat').innerHTML = `<option value="">Tutte le categorie</option>` + tutte.map(c => `<option ${movState.categoria === c ? 'selected' : ''}>${esc(c)}</option>`).join('');
   const q = norm(movState.cerca.trim());
-  const vis = lista.filter(m => (!movState.categoria || m.categoria === movState.categoria) && (!q || norm(m.descrizione + ' ' + (m.note || '')).includes(q)));
+  const vis = lista.filter(m => nelDettaglio(m) && (!movState.categoria || m.categoria === movState.categoria) && (!q || norm(m.descrizione + ' ' + (m.note || '')).includes(q)));
   const tot = vis.filter(contaNeiTotali).reduce((s, m) => s + m.importo, 0);
-  $('#mov-conta').textContent = `${vis.length} ${vis.length === 1 ? 'movimento' : 'movimenti'}${movState.categoria || q ? ` · ${tot >= 0 ? '+' : '−'}${eur.format(Math.abs(tot))}` : ''}`;
+  $('#mov-conta').textContent = `${vis.length} ${vis.length === 1 ? 'movimento' : 'movimenti'}${movState.categoria || q || movState.mese ? ` · ${tot >= 0 ? '+' : '−'}${eur.format(Math.abs(tot))}` : ''}`;
   $('#mov-lista').innerHTML = vis.slice(0, movState.mostra).map(m => `
     <div class="riga riga-mov ${contaNeiTotali(m) ? '' : 'escluso'}" data-mov="${m.id}" role="button" tabindex="0">
       <div class="data">${fmtData(m.data)}</div>
@@ -234,7 +267,8 @@ $('#mov-fonte').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
   movState.fonte = b.dataset.fonte; movState.mostra = 100; renderMovimenti();
 });
-$('#mov-anno').addEventListener('change', e => { movState.anno = e.target.value; movState.mostra = 100; renderMovimenti(); });
+$('#mov-anno').addEventListener('change', e => { movState.anno = e.target.value; movState.mostra = 100; movState.mese = movState.verso = null; renderMovimenti(); });
+$('#section-movimenti').addEventListener('click', e => { if (e.target.closest('[data-chiudi-dettaglio]')) chiudiDettaglio(); });
 $('#mov-categorie').addEventListener('click', e => {
   const c = e.target.closest('[data-cat]')?.dataset.cat; if (c == null) return;
   movState.categoria = movState.categoria === c ? '' : c; movState.mostra = 100;

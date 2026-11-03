@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="styles.css?v=20261103-1" />
+    <link rel="stylesheet" href="styles.css?v=20261103-2" />
   </head>
   <body>
     <!-- Accesso -->
@@ -197,14 +197,15 @@
               <div class="legend"><span><i style="background:var(--entrate)"></i>Entrate</span><span><i style="background:var(--uscite)"></i>Uscite</span></div>
             </header>
             <div class="chart-box"><canvas id="chart-mov" aria-label="Entrate e uscite per mese"></canvas></div>
-            <p class="foot muted" id="mov-chart-foot">I pagamenti delle carte dal conto non contano: le spese sono quelle delle carte, una per una.</p>
+            <p class="foot muted" id="mov-chart-foot">Tocca una colonna per vedere il dettaglio di quel mese. I pagamenti delle carte dal conto non contano: le spese sono quelle delle carte, una per una.</p>
           </article>
 
-          <article class="card">
+          <article class="card" id="mov-cat-card">
             <header class="card-head">
-              <h2>Uscite per categoria</h2>
+              <h2 id="mov-cat-titolo">Uscite per categoria</h2>
               <span class="muted small-text" id="mov-cat-tot"></span>
             </header>
+            <div class="filtro-attivo" data-filtro hidden></div>
             <div id="mov-categorie" class="cat-lista"></div>
             <p class="foot muted">Tocca una categoria per vederne i movimenti.</p>
           </article>
@@ -214,6 +215,7 @@
               <h2>Elenco</h2>
               <span class="muted small-text" id="mov-conta"></span>
             </header>
+            <div class="filtro-attivo" data-filtro hidden></div>
             <div class="mov-filtri">
               <input type="search" id="mov-cerca" placeholder="Cerca nella descrizione o nelle note" aria-label="Cerca" />
               <select id="mov-cat" aria-label="Categoria"></select>
@@ -372,6 +374,6 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script src="supabase-config.js"></script>
     <script src="app.js?v=20261103-1"></script>
-    <script src="movimenti.js?v=20261103-2"></script>
+    <script src="movimenti.js?v=20261103-3"></script>
   </body>
 </html>

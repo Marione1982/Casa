@@ -83,9 +83,34 @@ function modelloPrezzo(lista) {
   return c => fisso + prezzo * c;
 }
 
-function stimaPeriodo(t, lista, p, costo) {
+// Luce: rapporto tra consumo in bolletta e prelievo misurato dall'inverter negli stessi bimestri
+// (corregge eventuali differenze tra contatore e inverter)
+function taraturaInverter(lista) {
+  const coppie = (typeof fv !== 'undefined' ? fv : [])
+    .filter(r => r.kwh_prelevati > 0)
+    .map(r => [lista.find(b => b.codice === r.codice)?.consumo, r.kwh_prelevati])
+    .filter(([b]) => b > 0);
+  if (!coppie.length) return { fattore: 1, n: 0 };
+  const f = coppie.reduce((s, [b]) => s + b, 0) / coppie.reduce((s, [, i]) => s + i, 0);
+  return { fattore: f > 0.7 && f < 1.3 ? f : 1, n: coppie.length };
+}
+
+function stimaPeriodo(t, lista, p, costo, taratura) {
   const anno = Number(p.codice.slice(0, 4)), resto = p.codice.slice(4);
   const passati = [1, 2, 3].map(k => lista.find(b => b.codice === `${anno - k}${resto}`)).filter(Boolean);
+  // Luce con il prelievo dall'inverter: consumo reale (fino a oggi, se il bimestre è in corso)
+  const inv = t === 'luce' && typeof fv !== 'undefined' ? fv.find(r => r.codice === p.codice && r.kwh_prelevati != null) : null;
+  if (inv) {
+    const misurato = inv.kwh_prelevati * taratura.fattore;
+    if (!p.inCorso) return { stima: costo(misurato), min: costo(misurato * 0.92), max: costo(misurato * 1.08), consumo: misurato, misurato };
+    // bimestre in corso: misurato finora + la parte che manca, come negli anni scorsi
+    const tot = giorniTra(p.dal, p.al) + 1, passatiGg = Math.min(tot, giorniTra(p.dal, oggiIso()) + 1);
+    const mancante = 1 - passatiGg / tot;
+    const storici = passati.map(b => b.consumo);
+    const medio = storici.length ? media(storici.slice(0, 2)) : misurato / Math.max(0.05, 1 - mancante);
+    const lo = storici.length ? Math.min(...storici) : medio, hi = storici.length ? Math.max(...storici) : medio;
+    return { stima: costo(misurato + medio * mancante), min: costo(misurato + lo * mancante), max: costo(misurato + hi * mancante), consumo: misurato + medio * mancante, misurato, finora: true };
+  }
   if (!passati.length) return null;
   if (t === 'acqua') {
     // acconti e conguagli rendono poco affidabile il legame consumo-prezzo: si guarda lo stesso trimestre degli anni prima
@@ -103,11 +128,12 @@ function prossimeBollette() {
     const lista = storico(t);
     if (lista.length < 3) continue;
     const costo = modelloPrezzo(lista);
+    const taratura = t === 'luce' ? taraturaInverter(lista) : { fattore: 1, n: 0 };
     const arrivo = Math.round(mediana(lista.slice(-6).filter(b => b.data_emissione).map(b => giorniTra(b.periodo_al, b.data_emissione))) ?? 20);
     // per chi paga a mano conta la scadenza, non quando è stata pagata in passato
     const pag = AUTOMATICO[t] ? ritardoPagamento(t, lista) : { giorni: RITARDO_DEFAULT[t] };
     for (const p of periodiMancanti(t, lista)) {
-      const s = stimaPeriodo(t, lista, p, costo);
+      const s = stimaPeriodo(t, lista, p, costo, taratura);
       if (!s) continue;
       const dataArrivo = piuGiorni(p.al, arrivo);
       righe.push({ tipo: t, ...p, ...s, dataArrivo, dataPagamento: piuGiorni(dataArrivo, pag.giorni), automatico: AUTOMATICO[t] });
@@ -141,6 +167,7 @@ function renderProssime() {
       <div class="pross-desc">
         <div><strong>${NOMI[r.tipo]}</strong> · ${nomePeriodo(r)}${r.inCorso ? ' <span class="badge">in corso</span>' : ''}</div>
         <div class="pross-date">${arrivo} · <span class="${r.automatico ? '' : 'a-mano'}">${pagamento}</span></div>
+        ${r.misurato != null ? `<div class="pross-inv">⚡ ${r.finora ? 'prelievo dalla rete finora' : 'prelievo dalla rete'}: ${num0.format(r.misurato)} kWh (inverter)</div>` : ''}
       </div>
       <div class="pross-importo"><span>~${eur0.format(tondo(r.stima))}</span>${forchetta}</div>
     </div>`;

@@ -1,5 +1,6 @@
 // Casa – aggiornamento del fotovoltaico da Fox ESS (FoxCloud Open API).
-// Legge produzione lorda (PVEnergyTotal), netta (generation) e venduti (feedin) mese per mese
+// Legge produzione lorda (PVEnergyTotal), netta (generation), venduti (feedin) e prelievo dalla rete
+// (gridConsumption) mese per mese
 // e aggiorna casa_fotovoltaico per bimestre. Gira con l'utente che la chiama (RLS attiva):
 // nessuna chiave service_role. La chiave Fox ESS sta solo nel segreto FOXESS_API_KEY.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
@@ -63,7 +64,7 @@ Deno.serve(async (req) => {
     const anni = oggi.getMonth() < 2 ? [oggi.getFullYear() - 1, oggi.getFullYear()] : [oggi.getFullYear()];
     const righe: any[] = [];
     for (const anno of anni) {
-      const res = await fox("/op/v0/device/report/query", { sn, year: anno, dimension: "year", variables: ["PVEnergyTotal", "generation", "feedin"] });
+      const res = await fox("/op/v0/device/report/query", { sn, year: anno, dimension: "year", variables: ["PVEnergyTotal", "generation", "feedin", "gridConsumption"] });
       const v = Object.fromEntries((res ?? []).map((x: any) => [x.variable, valori(x)]));
       for (let b = 0; b < 6; b++) {
         const m1 = b * 2, m2 = m1 + 1; // indici 0-11
@@ -80,6 +81,8 @@ Deno.serve(async (req) => {
           kwh_prodotti: pvCompleto ? pv : netti,
           kwh_netti: netti,
           kwh_immessi: r1((v.feedin?.[m1] ?? 0) + (v.feedin?.[m2] ?? 0)),
+          // prelievo dalla rete: null se Fox ESS non restituisce il dato
+          kwh_prelevati: v.gridConsumption ? r1((v.gridConsumption[m1] ?? 0) + (v.gridConsumption[m2] ?? 0)) : null,
         });
       }
       await new Promise((res) => setTimeout(res, 1100));
@@ -93,7 +96,7 @@ Deno.serve(async (req) => {
       for (const r of righe) {
         const e = esistenti?.find((x) => x.codice === r.codice);
         const { error } = e
-          ? await sb.from("casa_fotovoltaico").update({ kwh_prodotti: r.kwh_prodotti, kwh_netti: r.kwh_netti, kwh_immessi: r.kwh_immessi }).eq("id", e.id)
+          ? await sb.from("casa_fotovoltaico").update({ kwh_prodotti: r.kwh_prodotti, kwh_netti: r.kwh_netti, kwh_immessi: r.kwh_immessi, kwh_prelevati: r.kwh_prelevati }).eq("id", e.id)
           : await sb.from("casa_fotovoltaico").insert(r);
         if (error) throw error;
         scritti.push(r.codice);

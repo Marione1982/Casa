@@ -86,7 +86,7 @@ async function caricaDati() {
     oneri_extra: Number(r.oneri_extra), bonus: Number(r.bonus),
   }));
   fvDisponibile = !f.error && !g.error;
-  fv = (f.data || []).map(r => ({ ...r, kwh_prodotti: Number(r.kwh_prodotti), kwh_netti: r.kwh_netti == null ? null : Number(r.kwh_netti), kwh_immessi: r.kwh_immessi == null ? null : Number(r.kwh_immessi) }));
+  fv = (f.data || []).map(r => ({ ...r, kwh_prodotti: Number(r.kwh_prodotti), kwh_netti: r.kwh_netti == null ? null : Number(r.kwh_netti), kwh_immessi: r.kwh_immessi == null ? null : Number(r.kwh_immessi), kwh_prelevati: r.kwh_prelevati == null ? null : Number(r.kwh_prelevati) }));
   gse = (g.data || []).map(r => ({ ...r, importo: Number(r.importo) }));
   if (c.error) console.warn('Condominio non disponibile:', c.error.message);
   cond = (c.data || []).map(r => ({ ...r, importo: Number(r.importo) }));

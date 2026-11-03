@@ -1,4 +1,4 @@
-// Casa – sezione Movimenti: conto corrente, carte di credito (e in futuro Revolut).
+// Casa – sezione Movimenti: conto corrente Hello, carte di credito e Revolut.
 // Usa le funzioni e le variabili globali di app.js (sb, $, $$, eur, eur0, esc, fmtData, baseOptions, disegna, css, MESI…).
 'use strict';
 
@@ -12,6 +12,9 @@ const TIPI_MOV = { normale: '', pagamento_carta: 'pagamento carta', giroconto: '
 // Regole di base: se la descrizione contiene il testo (maiuscolo), il movimento va nella categoria.
 // Le regole salvate dall'app (casa_regole_categorie) hanno la precedenza. L'ordine conta: vince la prima.
 const REGOLE_BASE = [
+  // giroconti con Revolut visti dal conto Hello (l'IBAN Revolut di Mario ha ABI 03669-01600; "Revolut**" = ricarica Apple Pay)
+  ['INVIATO DA REVOLUT', 'Bonifici', 'giroconto'], ['FAV 03669-01600', 'Bonifici', 'giroconto'], ['REVOLUT**', 'Bonifici', 'giroconto'],
+  ['DISNEYLAND', 'Viaggi'],   // prima di DISNEY (Disney+)
   // pagamenti delle carte dal conto: non sono spese (le spese sono nei loro estratti)
   ['AMERICAN EXPRESS', 'Altro', 'pagamento_carta'],
   ['ESTRATTO CONTO CARTA', 'Altro', 'pagamento_carta'],
@@ -68,6 +71,15 @@ const REGOLE_BASE = [
   ['TENNIS', 'Sport e svago'], ['A.S.D.', 'Sport e svago'], ['ASD ', 'Sport e svago'], ['WATERPOLO', 'Sport e svago'], ['PISCINA', 'Sport e svago'],
   ['PALESTRA', 'Sport e svago'], ['CINEMA', 'Sport e svago'], ['UCI ', 'Sport e svago'], ['VIVATICKET', 'Sport e svago'], ['TICKET', 'Sport e svago'],
   ['LIDO', 'Sport e svago'], ['RUOTA PANORAMICA', 'Sport e svago'], ['ASSOCIAZIONE CULTURALE', 'Sport e svago'],
+  ['RATP', 'Viaggi'], ['SNCF', 'Viaggi'], ['IBIS', 'Viaggi'], ['TOUR EIFFEL', 'Viaggi'], ['FRANPRIX', 'Viaggi'],
+  ['MAGASIN U', 'Viaggi'], ['121 PARIS', 'Viaggi'], ['SOHO NY', 'Viaggi'], ['CASCATADELLEMARMORE', 'Viaggi'],
+  ['STARBUCKS', 'Ristoranti e bar'], ['AUTOGRILL', 'Ristoranti e bar'], ['PORZIONE DI PIZZA', 'Ristoranti e bar'], ['BAKERY', 'Ristoranti e bar'],
+  ['ROYAL PUB', 'Ristoranti e bar'], ['FOCACCE', 'Ristoranti e bar'], ['PUCCIA', 'Ristoranti e bar'], ['LUINI', 'Ristoranti e bar'], ['TAVERNA', 'Ristoranti e bar'],
+  ['PRIMARK', 'Shopping'], ['CALZEDONIA', 'Shopping'], ['TERRANOVA', 'Shopping'], ['ALCOTT', 'Shopping'], ['ACCESSORIZE', 'Shopping'], ['KIKO', 'Shopping'],
+  ['PEPCO', 'Shopping'], ['GOLDENPOINT', 'Shopping'], ['BIJOU', 'Shopping'], ['LUSH', 'Shopping'], ['PARRUCCH', 'Shopping'],
+  ['FIORERIA', 'Casa'], ['MAISONS DU MONDE', 'Casa'], ['COSTWAY', 'Casa'], ['GARDEN', 'Casa'], ['UNES U0', 'Spesa'], ['PENNY', 'Spesa'], ['SUPERCARNI', 'Spesa'],
+  ['ATM -', 'Trasporti'], ['TRASPORTI', 'Trasporti'], ['AUTOSTRADALE', 'Trasporti'], ['ORIO SHUTTLE', 'Trasporti'], ['PARK ', 'Trasporti'],
+  ['TRENORD', 'Trasporti'], ['LINEE LECCO', 'Trasporti'], ['MALPENSA', 'Trasporti'], ['COMPARK', 'Trasporti'], ['IP ITALIANA PETROLI', 'Trasporti'],
   ['LEARN AND SPEAK', 'Istruzione'], ['SCUOLA', 'Istruzione'], ['LIBRERIA', 'Istruzione'],
   ['OSTERIA', 'Ristoranti e bar'], ['GYRO', 'Ristoranti e bar'], ['BRACERIA', 'Ristoranti e bar'], ['PANINOTECA', 'Ristoranti e bar'],
   ['EASYJET', 'Viaggi'], ['VILLAGGIO TURISTICO', 'Viaggi'], ['RADIOLOGIA', 'Salute'], ['DR ', 'Salute'], ['DOTT', 'Salute'], ['REVISIONE', 'Trasporti'],
@@ -77,6 +89,15 @@ const REGOLE_BASE = [
   ['COMMISSION', 'Banca e tasse'], ['INTERESSI', 'Banca e tasse'], ['F24', 'Banca e tasse'], ['PAGOPA', 'Banca e tasse'], ['CBILL', 'Banca e tasse'],
   ['IMPOSTE', 'Banca e tasse'], ['POSTE ITALIANE', 'Banca e tasse'],
   ['BONIFICO', 'Bonifici'],
+];
+// Regole solo per Revolut (descrizioni brevi: si guardano dall'inizio). Gli spostamenti tra conto, pocket e
+// salvadanai Revolut e quelli con il conto Hello sono giroconti: non contano nei totali.
+const REGOLE_REVOLUT = [
+  [/^(A|DA) EUR /, 'Bonifici', 'giroconto'], [/^ACCREDITA EUR /, 'Bonifici', 'giroconto'], [/^PRELIEVO DA POCKET/, 'Bonifici', 'giroconto'],
+  [/^FROM /, 'Bonifici', 'giroconto'], [/^TO MARIO /, 'Bonifici', 'giroconto'], [/^RICARICA DI APPLE PAY/, 'Bonifici', 'giroconto'],
+  [/^PAGAMENTO DA (MARIO CAMPIONE|CAPUTO GIOVANNA)/, 'Bonifici', 'giroconto'],
+  [/^PERSONAL LOAN/, 'Altre entrate'], [/^REPAYMENT/, 'Finanziamenti'], [/^PROMO /, 'Altre entrate'],
+  [/^(TO |PAGAMENTO A FAVORE)/, 'Bonifici'],
 ];
 // Categorie stampate da Amex sotto ogni spesa
 const CATEGORIE_AMEX = [
@@ -128,6 +149,8 @@ function categorizza(m) {
   const d = norm(m.descrizione);
   const r = regoleUtente.find(x => d.includes(norm(x.testo)));
   if (r) return { categoria: r.categoria, tipo: r.tipo };
+  const rv = m.fonte === 'revolut' && REGOLE_REVOLUT.find(([re]) => re.test(d));
+  if (rv) return { categoria: rv[1], tipo: rv[2] || 'normale' };
   const b = REGOLE_BASE.find(([t]) => d.includes(t));
   let categoria = b?.[1], tipo = b?.[2] || 'normale';
   if (!b && m.categoria_amex) categoria = CATEGORIE_AMEX.find(([re]) => re.test(m.categoria_amex))?.[1];
@@ -347,7 +370,8 @@ mForm.addEventListener('submit', async e => {
 
 // Formati accettati:
 // 1) CSV "lista movimenti" di Hello bank (Data contabile;Data valuta;Descrizione;Dettaglio;Importo)
-// 2) JSON preparato da Claude dagli estratti conto PDF: { movimenti: [{fonte, data, data_contabile, descrizione, importo, estratto, categoria_amex}] }
+// 2) CSV "estratto conto" di Revolut (sezioni per conto e pocket; Data,Descrizione,Categoria,"Denaro in entrata/uscita",…)
+// 3) JSON preparato da Claude dagli estratti conto PDF: { movimenti: [{fonte, data, data_contabile, descrizione, importo, estratto, categoria_amex}] }
 const dmY = s => { const m = String(s).match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/); return m ? `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}` : null; };
 const numIt = s => Number(String(s).replace(/\./g, '').replace(',', '.').replace('+', ''));
 const decodifica = s => String(s).replace(/&apos;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, '&');
@@ -370,6 +394,66 @@ function leggiCsvHelloBank(testo) {
   return { movimenti: out, nonContabilizzati: saltate };
 }
 
+// Riga CSV con virgole e campi tra virgolette ("1.234,56€")
+function campiCsv(r) {
+  const out = []; let cur = '', q = false;
+  for (let i = 0; i < r.length; i++) {
+    const ch = r[i];
+    if (q) { if (ch === '"' && r[i + 1] === '"') { cur += '"'; i++; } else if (ch === '"') q = false; else cur += ch; }
+    else if (ch === '"') q = true; else if (ch === ',') { out.push(cur.trim()); cur = ''; } else cur += ch;
+  }
+  out.push(cur.trim()); return out;
+}
+const MESI_REV = { gen: 1, feb: 2, mar: 3, apr: 4, mag: 5, giu: 6, lug: 7, ago: 8, set: 9, ott: 10, nov: 11, dic: 12 };
+const dataRev = s => { const m = String(s).match(/^(\d{1,2}) ([a-z]{3}) (\d{4})$/i); const n = m && MESI_REV[m[2].toLowerCase()];
+  return n ? `${m[3]}-${String(n).padStart(2, '0')}-${m[1].padStart(2, '0')}` : null; };
+
+// Estratto conto Revolut: si leggono le operazioni del conto personale e dei pocket (es. "Giovi", "Mario").
+// Gli interessi dei salvadanai (sezione "Conti deposito") si saltano: sono pochi centesimi al giorno.
+function leggiCsvRevolut(testo) {
+  const righe = testo.replace(/^\uFEFF/, '').split(/\r?\n/);
+  if (!righe.some(r => /Revolut/i.test(r)) || !righe.some(r => /^"?Data"?,"?Descrizione"?,"?Categoria"?/i.test(r))) return null;
+  const out = []; let sezione = null, operazioni = false, inTabella = false;
+  for (const r of righe) {
+    const c = campiCsv(r);
+    if (/Estratti conto delle operazioni/i.test(c[0])) { operazioni = /^Conti correnti/i.test(c[0]); continue; }
+    if (/Transaction Statements|Riepiloghi/i.test(c[0])) { operazioni = false; continue; }
+    if (!operazioni) continue;
+    const titolo = c[0].match(/^(.+) \(EUR\)$/);
+    if (titolo && c.slice(1).every(x => !x)) { sezione = titolo[1].trim(); inTabella = false; continue; }
+    if (/^Data$/i.test(c[0]) && /^Descrizione$/i.test(c[1])) { inTabella = true; continue; }
+    if (!inTabella || !sezione) continue;
+    if (/^Totale$/i.test(c[0])) { inTabella = false; continue; }
+    const data = dataRev(c[0]);
+    const importo = numIt(String(c[3] || '').replace(/[€\s]/g, ''));
+    if (!data || !c[1] || !Number.isFinite(importo)) continue;
+    const pocket = /^Conto personale$/i.test(sezione) ? '' : ` (pocket ${sezione})`;
+    out.push({ fonte: 'revolut', data, data_contabile: data, descrizione: c[1] + pocket, importo, estratto: 'csv' });
+  }
+  return { movimenti: out, nonContabilizzati: 0 };
+}
+
+// Bonifici tra conto Hello e Revolut: il movimento Revolut è già giroconto (REGOLE_REVOLUT); qui si cerca sul conto Hello
+// quello opposto (stesso importo, da 4 giorni prima a 2 dopo) e si segna anch'esso come giroconto, così non conta due volte.
+async function abbinaGiroconti() {
+  const daRev = movimenti.filter(m => m.fonte === 'revolut' && m.tipo === 'giroconto'
+    && /^(PAGAMENTO DA |TO MARIO |RICARICA DI APPLE PAY)/.test(norm(m.descrizione)));
+  const giorni = (a, b) => (new Date(a) - new Date(b)) / 864e5;
+  const usati = new Set(movimenti.filter(m => m.fonte === 'conto_hb' && m.tipo === 'giroconto').map(m => m.id));
+  const daSegnare = [];
+  for (const r of daRev) {
+    const c = movimenti.filter(m => m.fonte === 'conto_hb' && !usati.has(m.id) && m.tipo === 'normale'
+      && Math.abs(m.importo + r.importo) < 0.005 && giorni(m.data, r.data) >= -4 && giorni(m.data, r.data) <= 2)
+      .sort((a, b) => Math.abs(giorni(a.data, r.data)) - Math.abs(giorni(b.data, r.data)))[0];
+    if (c) { usati.add(c.id); daSegnare.push(c.id); }
+  }
+  for (let i = 0; i < daSegnare.length; i += 200) {
+    const { error } = await sb.from('casa_movimenti').update({ tipo: 'giroconto', categoria: 'Bonifici' }).in('id', daSegnare.slice(i, i + 200));
+    if (error) { console.warn('Giroconti non aggiornati:', error.message); return 0; }
+  }
+  return daSegnare.length;
+}
+
 async function importaFile(file) {
   const msg = $('#mov-import-msg');
   const mostra = (t, errore = false) => { msg.hidden = false; msg.textContent = t; msg.classList.toggle('error', errore); };
@@ -379,8 +463,8 @@ async function importaFile(file) {
   if (/\.json$/i.test(file.name) || testo.trim().startsWith('{')) {
     try { lotto = JSON.parse(testo).movimenti; } catch { return mostra('Il file JSON non è leggibile.', true); }
   } else {
-    const r = leggiCsvHelloBank(testo);
-    if (!r) return mostra('Formato non riconosciuto: serve il CSV “lista movimenti” di Hello bank o un file preparato da Claude.', true);
+    const r = leggiCsvHelloBank(testo) || leggiCsvRevolut(testo);
+    if (!r) return mostra('Formato non riconosciuto: serve il CSV “lista movimenti” di Hello bank, l’estratto conto CSV di Revolut o un file preparato da Claude.', true);
     lotto = r.movimenti; nonContabilizzati = r.nonContabilizzati;
   }
   if (!Array.isArray(lotto) || !lotto.length) return mostra('Nel file non ci sono movimenti.', true);
@@ -407,10 +491,13 @@ async function importaFile(file) {
   }
   await caricaMovimenti();
   const nuovi = movimenti.length - prima;
+  const abbinati = await abbinaGiroconti();
+  if (abbinati) await caricaMovimenti();
   const note = [
     `${nuovi} ${nuovi === 1 ? 'movimento nuovo' : 'movimenti nuovi'}`,
     righe.length - nuovi ? `${righe.length - nuovi} già presenti` : '',
     coperti ? `${coperti} già coperti dagli estratti conto` : '',
+    abbinati ? `${abbinati} ${abbinati === 1 ? 'bonifico' : 'bonifici'} tra Hello e Revolut segnati come giroconto` : '',
     nonContabilizzati ? `${nonContabilizzati} non ancora contabilizzati (li prenderai col prossimo file)` : '',
   ].filter(Boolean);
   mostra(`Importazione completata: ${note.join(', ')}.`);

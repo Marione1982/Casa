@@ -213,7 +213,7 @@ function renderSpeseElenco(voci) {
   $$('#sf-vista button').forEach(b => b.classList.toggle('on', b.dataset.vista === speseVista));
   const vis = voci.filter(s => !s.virtuale && (speseVista === 'attive' ? !s.fine || s.fine >= oggi : s.fine && s.fine < oggi));
   const ordine = { mutuo: 0, finanziamento: 1, rate: 2, abbonamento: 3 };
-  vis.sort((a, b) => ordine[a.tipo] - ordine[b.tipo] || (a.fine || '9999').localeCompare(b.fine || '9999') || a.nome.localeCompare(b.nome));
+  vis.sort((a, b) => ordine[a.tipo] - ordine[b.tipo] || (a.giorno ?? 99) - (b.giorno ?? 99) || b.importo - a.importo || a.nome.localeCompare(b.nome));
   let tipoCorrente = null;
   $('#sf-lista').innerHTML = vis.length ? vis.map(s => {
     const n = rateRimaste(s);

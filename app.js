@@ -91,6 +91,7 @@ async function caricaDati() {
   if (c.error) console.warn('Condominio non disponibile:', c.error.message);
   cond = (c.data || []).map(r => ({ ...r, importo: Number(r.importo) }));
   render();
+  if (typeof caricaMovimenti === 'function') caricaMovimenti();   // sezione Movimenti (movimenti.js)
 }
 
 // Bimestri del fotovoltaico arricchiti con il prelievo dalla bolletta luce dello stesso nome

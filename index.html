@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="styles.css?v=20261102-6" />
+    <link rel="stylesheet" href="styles.css?v=20261103-1" />
   </head>
   <body>
     <!-- Accesso -->
@@ -34,6 +34,7 @@
         <nav class="sections" aria-label="Sezioni">
           <button class="section-tab active" data-section="forniture">Forniture</button>
           <button class="section-tab" data-section="condominio">Condominio</button>
+          <button class="section-tab" data-section="movimenti">Movimenti</button>
           <button class="section-tab" data-section="spese">Spese fisse</button>
           <button class="section-tab" data-section="budget">Budget</button>
         </nav>
@@ -170,6 +171,58 @@
           </article>
         </section>
 
+        <!-- Sezione Movimenti -->
+        <section id="section-movimenti" class="section" hidden>
+          <div class="section-head">
+            <div>
+              <h1>Movimenti</h1>
+              <p class="muted" id="mov-period">Conto, carte di credito</p>
+            </div>
+            <label class="btn primary file-btn">Importa
+              <input type="file" id="mov-file" accept=".csv,.json,text/csv,application/json" hidden />
+            </label>
+          </div>
+          <p id="mov-import-msg" class="form-message" role="status" hidden></p>
+
+          <div class="filters" role="group" aria-label="Filtri">
+            <div class="segmented" id="mov-fonte"></div>
+            <select id="mov-anno" aria-label="Anno" class="filtro-select"></select>
+          </div>
+
+          <div class="kpis" id="mov-kpis"></div>
+
+          <article class="card">
+            <header class="card-head">
+              <h2>Entrate e uscite per mese</h2>
+              <div class="legend"><span><i style="background:var(--entrate)"></i>Entrate</span><span><i style="background:var(--uscite)"></i>Uscite</span></div>
+            </header>
+            <div class="chart-box"><canvas id="chart-mov" aria-label="Entrate e uscite per mese"></canvas></div>
+            <p class="foot muted" id="mov-chart-foot">I pagamenti delle carte dal conto non contano: le spese sono quelle delle carte, una per una.</p>
+          </article>
+
+          <article class="card">
+            <header class="card-head">
+              <h2>Uscite per categoria</h2>
+              <span class="muted small-text" id="mov-cat-tot"></span>
+            </header>
+            <div id="mov-categorie" class="cat-lista"></div>
+            <p class="foot muted">Tocca una categoria per vederne i movimenti.</p>
+          </article>
+
+          <article class="card" id="mov-elenco">
+            <header class="card-head">
+              <h2>Elenco</h2>
+              <span class="muted small-text" id="mov-conta"></span>
+            </header>
+            <div class="mov-filtri">
+              <input type="search" id="mov-cerca" placeholder="Cerca nella descrizione o nelle note" aria-label="Cerca" />
+              <select id="mov-cat" aria-label="Categoria"></select>
+            </div>
+            <div id="mov-lista" class="lista"></div>
+            <button class="btn ghost" type="button" id="mov-altri" hidden>Mostra altri</button>
+          </article>
+        </section>
+
         <section id="section-spese" class="section" hidden>
           <div class="empty-state"><h1>Spese fisse</h1><p class="muted">In arrivo: rate, finanziamenti e abbonamenti dal tuo foglio Excel, con la proiezione dei mesi futuri.</p></div>
         </section>
@@ -287,9 +340,38 @@
       </form>
     </dialog>
 
+    <!-- Finestra movimento -->
+    <dialog id="mov-dialog">
+      <form id="mov-form" method="dialog" class="stack">
+        <h2>Movimento</h2>
+        <div class="mov-info" id="mov-info"></div>
+        <div class="grid2">
+          <label>Categoria<select name="categoria" id="mov-f-cat"></select></label>
+          <label>Conteggio
+            <select name="tipo">
+              <option value="normale">Entrata o spesa</option>
+              <option value="pagamento_carta">Pagamento carta (non conta)</option>
+              <option value="giroconto">Giroconto tra miei conti (non conta)</option>
+            </select>
+          </label>
+        </div>
+        <label>Note<textarea name="note" rows="2"></textarea></label>
+        <label class="check"><input type="checkbox" name="regola" /> Applica anche agli altri movimenti che contengono</label>
+        <input name="testo" aria-label="Testo della regola" />
+        <p class="muted small-text" id="mov-regola-info"></p>
+        <p id="mov-message" class="form-message" role="status"></p>
+        <div class="dialog-actions">
+          <span class="spacer"></span>
+          <button type="button" class="btn ghost" data-close>Annulla</button>
+          <button type="submit" class="btn primary">Salva</button>
+        </div>
+      </form>
+    </dialog>
+
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script src="supabase-config.js"></script>
-    <script src="app.js?v=20261102-7"></script>
+    <script src="app.js?v=20261103-1"></script>
+    <script src="movimenti.js?v=20261103-1"></script>
   </body>
 </html>

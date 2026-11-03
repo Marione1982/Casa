@@ -6,6 +6,7 @@ const FONTI = { conto_hb: 'Conto Hello', carta_hb: 'Carta Hello', amex: 'Amex', 
 const CATEGORIE_USCITA = ['Spesa', 'Ristoranti e bar', 'Casa', 'Utenze', 'Condominio', 'Finanziamenti', 'Trasporti', 'Salute',
   'Abbonamenti', 'Shopping', 'Sport e svago', 'Viaggi', 'Istruzione', 'Bonifici', 'Contanti', 'Banca e tasse', 'Altro'];
 const CATEGORIE_ENTRATA = ['Stipendi', 'Rimborsi', 'Altre entrate'];
+const alfabetico = (a, b) => a.localeCompare(b, 'it', { sensitivity: 'base' });
 const TIPI_MOV = { normale: '', pagamento_carta: 'pagamento carta', giroconto: 'giroconto' };
 
 // Regole di base: se la descrizione contiene il testo (maiuscolo), il movimento va nella categoria.
@@ -243,7 +244,7 @@ function renderCategorie(valide) {
 }
 
 function renderListaMov(lista) {
-  const tutte = [...new Set([...CATEGORIE_USCITA, ...CATEGORIE_ENTRATA, ...movimenti.map(m => m.categoria).filter(Boolean)])];
+  const tutte = [...new Set([...CATEGORIE_USCITA, ...CATEGORIE_ENTRATA, ...movimenti.map(m => m.categoria).filter(Boolean)])].sort(alfabetico);
   $('#mov-cat').innerHTML = `<option value="">Tutte le categorie</option>` + tutte.map(c => `<option ${movState.categoria === c ? 'selected' : ''}>${esc(c)}</option>`).join('');
   const q = norm(movState.cerca.trim());
   const vis = lista.filter(m => nelDettaglio(m) && (!movState.categoria || m.categoria === movState.categoria) && (!q || norm(m.descrizione + ' ' + (m.note || '')).includes(q)));
@@ -297,7 +298,7 @@ function apriMov(m) {
   $('#mov-message').textContent = ''; $('#mov-message').classList.remove('error');
   $('#mov-info').innerHTML = `<strong class="${m.importo > 0 ? 'entrata' : ''}">${m.importo > 0 ? '+' : '−'}${eur.format(Math.abs(m.importo))}</strong>
     <span>${esc(m.descrizione)}</span><span class="muted small-text">${FONTI[m.fonte]} · ${fmtData(m.data)}${m.estratto && m.estratto !== 'csv' ? ` · estratto ${esc(m.estratto)}` : ''}</span>`;
-  const cats = [...new Set([...(m.importo > 0 ? CATEGORIE_ENTRATA : CATEGORIE_USCITA), m.categoria].filter(Boolean))];
+  const cats = [...new Set([...(m.importo > 0 ? CATEGORIE_ENTRATA : CATEGORIE_USCITA), m.categoria].filter(Boolean))].sort(alfabetico);
   $('#mov-f-cat').innerHTML = cats.map(c => `<option>${esc(c)}</option>`).join('');
   const f = mForm.elements;
   f.categoria.value = m.categoria || 'Altro'; f.tipo.value = m.tipo; f.note.value = m.note || '';

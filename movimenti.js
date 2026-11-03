@@ -16,13 +16,18 @@ const REGOLE_BASE = [
   ['ESTRATTO CONTO CARTA', 'Altro', 'pagamento_carta'],
   ['ADDEBITO CARTA DI CREDITO', 'Altro', 'pagamento_carta'],
   ['ADDEBITO SALDO CARTA', 'Altro', 'pagamento_carta'],
+  ['UTILIZZO CARTA DI CREDITO', 'Altro', 'pagamento_carta'],
   // entrate
-  ['STIPENDI', 'Stipendi'], ['EMOLUMENTI', 'Stipendi'], ['INPS', 'Altre entrate'],
+  ['STIPENDI', 'Stipendi'], ['EMOLUMENTI', 'Stipendi'], ['INPS', 'Altre entrate'], ['ASSEGNO UNICO', 'Altre entrate'],
+  ['GESTORE DEI SERVIZI ENERGETICI', 'Altre entrate'], ['VERSAMENTO DI CONTANTE', 'Altre entrate'],
+  ['RIMBORSO FINANZIAMENTO', 'Finanziamenti'], ['RIF. CIRCUITO', 'Rimborsi'],
   ['RIMBORSO', 'Rimborsi'], ['STORNO', 'Rimborsi'],
   // utenze e casa
   ['EDISON', 'Utenze'], ['AMGAS', 'Utenze'], ['ACQUEDOTTO', 'Utenze'], ['ENEL', 'Utenze'], ['SERVIZIO ELETTRICO', 'Utenze'],
   ['TELECOM', 'Utenze'], ['TIM ', 'Utenze'], ['ILIAD', 'Utenze'], ['VODAFONE', 'Utenze'], ['WINDTRE', 'Utenze'], ['FASTWEB', 'Utenze'],
-  ['CONDOMINIO', 'Condominio'],
+  ['CONDOMINIO', 'Condominio'], ['QUOTA ORDINARIA', 'Condominio'], ['QUOTE ORDINARIE', 'Condominio'],
+  ['PAG PUB', 'Banca e tasse'], ['GOMME', 'Trasporti'], ['POLIAMBULATOR', 'Salute'], ['MOBILI', 'Casa'], ['AGRIEURO', 'Casa'],
+  ['ARCAPLANET', 'Casa'], ['GIOIELL', 'Shopping'],
   ['LEROY MERLIN', 'Casa'], ['BRICO', 'Casa'], ['IKEA', 'Casa'], ['CASA MANIA', 'Casa'], ['HAPPY CASA', 'Casa'], ['TECNOMAT', 'Casa'],
   ['VORWERK', 'Casa'], ['FERRAMENTA', 'Casa'], ['EDILSERVICE', 'Casa'], ['BOTANICALS', 'Casa'],
   // finanziamenti
@@ -317,7 +322,8 @@ function leggiCsvHelloBank(testo) {
   const out = []; let saltate = 0;
   for (const r of righe.slice(i + 1)) {
     if (!r.trim()) continue;
-    const c = r.split(';').map(x => decodifica(x.replace(/^"|"$/g, '').trim()));
+    // campi tra virgolette: un ";" dentro le virgolette (es. "Dell&apos;istruzione") non separa i campi
+    const c = (r.match(/("([^"]*)"|[^;]*)(;|$)/g) || []).map(x => decodifica(x.replace(/;$/, '').replace(/^"|"$/g, '').trim()));
     if (c.length < 5) continue;
     const contabile = dmY(c[0]), valuta = dmY(c[1]);
     if (!contabile) { saltate++; continue; }          // "Non contabilizzato": arriverà col prossimo file

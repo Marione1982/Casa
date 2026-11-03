@@ -63,6 +63,9 @@ const REGOLE_BASE = [
   ['PALESTRA', 'Sport e svago'], ['CINEMA', 'Sport e svago'], ['UCI ', 'Sport e svago'], ['VIVATICKET', 'Sport e svago'], ['TICKET', 'Sport e svago'],
   ['LIDO', 'Sport e svago'], ['RUOTA PANORAMICA', 'Sport e svago'], ['ASSOCIAZIONE CULTURALE', 'Sport e svago'],
   ['LEARN AND SPEAK', 'Istruzione'], ['SCUOLA', 'Istruzione'], ['LIBRERIA', 'Istruzione'],
+  ['OSTERIA', 'Ristoranti e bar'], ['GYRO', 'Ristoranti e bar'], ['BRACERIA', 'Ristoranti e bar'], ['PANINOTECA', 'Ristoranti e bar'],
+  ['EASYJET', 'Viaggi'], ['VILLAGGIO TURISTICO', 'Viaggi'], ['RADIOLOGIA', 'Salute'], ['DR ', 'Salute'], ['DOTT', 'Salute'], ['REVISIONE', 'Trasporti'],
+  ['HAIR', 'Shopping'], ['ASOS', 'Shopping'], ['MEDIA WORLD', 'Shopping'], ['MEDIAWORLD', 'Shopping'], ['TEDI ', 'Shopping'], ['GEDIDIGITAL', 'Abbonamenti'],
   // banca, tasse, contanti, bonifici
   ['PRELIEVO', 'Contanti'], ['PREL ', 'Contanti'], ['CANONE CONTO', 'Banca e tasse'], ['IMPOSTA DI BOLLO', 'Banca e tasse'], ['BOLLO', 'Banca e tasse'],
   ['COMMISSION', 'Banca e tasse'], ['INTERESSI', 'Banca e tasse'], ['F24', 'Banca e tasse'], ['PAGOPA', 'Banca e tasse'], ['CBILL', 'Banca e tasse'],

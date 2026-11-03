@@ -203,7 +203,7 @@ create table public.casa_spese_fisse (
   id          uuid primary key default gen_random_uuid(),
   user_id     uuid not null default auth.uid() references auth.users(id) on delete cascade,
   nome        text not null,                 -- es. "Apple iPhone", "Netflix"
-  tipo        text not null check (tipo in ('mutuo','finanziamento','rate','abbonamento')),
+  tipo        text not null check (tipo in ('mutuo','finanziamento','rate','abbonamento','carta')),
   creditore   text,                          -- BNL, Findomestic, PayPal…
   pagamento   text check (pagamento in ('conto_hb','carta_hb','amex','revolut')), -- vuoto = da completare
   importo     numeric(10,2) not null check (importo >= 0),
@@ -215,7 +215,9 @@ create table public.casa_spese_fisse (
   cerca       text,                          -- testo per riconoscerla nei Movimenti
   note        text,
   created_at  timestamptz not null default now(),
-  updated_at  timestamptz not null default now()
+  updated_at  timestamptz not null default now(),
+  estratto_carta text check (estratto_carta in ('carta_hb','amex','revolut')), -- tipo carta: di quale carta leggere l'estratto
+  mese_estratto  smallint not null default 0 check (mese_estratto in (0,1))   -- 1 = estratto del mese precedente
 );
 
 create index casa_spese_fisse_user_idx on public.casa_spese_fisse (user_id);

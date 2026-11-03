@@ -360,3 +360,9 @@ label.check input { width: auto; }
   .sf-nav h2 { min-width: 0; flex: 1; }
   .sf-mese-tot { text-align: left; }
 }
+.sf-carte { margin-top: 6px; padding-top: 12px; border-top: 1px solid var(--border); }
+.sf-carte-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; padding: 0 2px 2px; }
+.sf-carte-head h3 { margin: 0; font-size: 15px; }
+.sf-carte-head span { font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; }
+.sf-carte-head small { display: block; font-size: 12px; font-weight: 500; color: var(--text-3); }
+.sf-carte .foot { margin-top: 8px; }

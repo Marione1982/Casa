@@ -13,6 +13,7 @@ const TIPI_SF = {
   rate: { nome: 'Pagamenti a rate', colore: '--luce' },
   abbonamento: { nome: 'Abbonamenti', colore: '--fv' },
   condominio: { nome: 'Condominio', colore: '--ord' },
+  carta: { nome: 'Addebiti carte', colore: '--rete' },
 };
 const PAGAMENTI_SF = { conto_hb: 'Conto Hello', carta_hb: 'Carta Hello', amex: 'Amex', revolut: 'Revolut' };
 const oggiRoma = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Rome' });
@@ -33,7 +34,27 @@ function voceCondominio() {
   if (!q) return null;
   return { id: 'condominio', nome: 'Condominio', tipo: 'condominio', creditore: 'Quota ordinaria', pagamento: 'conto_hb', importo: q, frequenza: 'mensile', giorno: 27, cerca: 'CONDOMINIO', virtuale: true };
 }
-const tutteLeVoci = () => { const c = voceCondominio(); return c ? [...spese, c] : spese; };
+// Le spese fisse vere e proprie; gli addebiti delle carte (tipo "carta") stanno a parte e non entrano nei totali,
+// perché contengono già le spese fisse pagate con le carte.
+const tutteLeVoci = () => { const f = spese.filter(s => s.tipo !== 'carta'); const c = voceCondominio(); return c ? [...f, c] : f; };
+const vociCarte = () => spese.filter(s => s.tipo === 'carta');
+
+/* ---------- Addebiti delle carte ---------- */
+
+// Codice dell'estratto della carta che viene addebitato nel mese k (es. carta Hello: novembre ← estratto di ottobre)
+const codiceEstratto = (s, k) => ymAdd(k, -(s.mese_estratto || 0)).replace('-', '');
+const nomeEstratto = (s, k) => MESI_LUNGHI[Number(ymAdd(k, -(s.mese_estratto || 0)).slice(5)) - 1];
+// Totale dell'estratto (dai movimenti importati con quel codice); null se l'estratto non è ancora caricato, 0 se non esiste (nessuna spesa)
+function totaleEstratto(s, k) {
+  const lista = typeof movimenti !== 'undefined' ? movimenti : [];
+  const cod = codiceEstratto(s, k);
+  const mov = lista.filter(m => m.fonte === s.estratto_carta && m.estratto === cod);
+  if (mov.length) return Math.round(-mov.reduce((t, m) => t + m.importo, 0) * 100) / 100;
+  const ultimo = lista.reduce((mx, m) => m.fonte === s.estratto_carta && /^\d{6}$/.test(m.estratto || '') && m.estratto > mx ? m.estratto : mx, '');
+  return ultimo && ultimo > cod ? 0 : null;   // estratti successivi già caricati → quel mese non c'era niente da pagare
+}
+// La voce carta con l'importo del mese k
+const cartaDelMese = (s, k) => ({ ...s, importo: totaleEstratto(s, k), _stima: true });
 
 // La voce è dovuta nel mese k?
 function attivaNelMese(s, k) {
@@ -68,12 +89,12 @@ function abbinaMese(k, voci) {
     const prev = dataPrevista(s, k);
     if (!prev || !s.pagamento) continue;
     const parole = (s.cerca || '').split('|').map(p => p.trim().toUpperCase()).filter(Boolean);
-    const toll = Math.max(1, s.importo * 0.04);
+    const toll = s.tipo === 'carta' ? (s.importo == null ? Infinity : 1) : Math.max(1, s.importo * 0.04);
     for (const m of lista) {
       if (m.importo >= 0 || m.fonte !== s.pagamento) continue;
       const dg = giorniFra(prev, m.data);
       if (dg < -8 || dg > 10) continue;
-      const di = Math.abs(-m.importo - s.importo);
+      const di = s.importo == null ? 0 : Math.abs(-m.importo - s.importo);
       if (di > toll) continue;
       if (parole.length && !parole.some(p => norm(m.descrizione).includes(p))) continue;
       coppie.push({ s, m, punti: di * 10 + Math.abs(dg) * 0.3 });
@@ -105,10 +126,13 @@ function statoVoce(s, k, abb) {
   const prev = dataPrevista(s, k);
   const m = abb.get(s.id);
   if (m) {
-    const diverso = Math.abs(-m.importo - s.importo) >= 0.01 ? ` (${eur.format(-m.importo)})` : '';
+    const diverso = s.importo != null && Math.abs(-m.importo - s.importo) >= 0.01 ? ` (${eur.format(-m.importo)})` : '';
     return { cls: 'ok', testo: `Addebitata il ${fmtGiorno(m.data)}${diverso}`, mov: m };
   }
   const oggi = oggiRoma();
+  if (s.tipo === 'carta' && prev >= oggi) return s.importo == null
+    ? { cls: 'attesa', testo: `Previsto il ${fmtGiorno(prev)} · estratto di ${nomeEstratto(s, ym(prev))} non ancora caricato` }
+    : { cls: 'arrivo', testo: `Pianificato il ${fmtGiorno(prev)} · estratto di ${nomeEstratto(s, ym(prev))}` };
   if (prev >= oggi) return { cls: 'arrivo', testo: `In arrivo il ${fmtGiorno(prev)}` };
   const ultima = ultimaDataFonte(s.pagamento);
   if (!ultima || giorniFra(prev, ultima) < 10) return { cls: 'attesa', testo: `Prevista il ${fmtGiorno(prev)}, movimenti non ancora importati` };
@@ -168,6 +192,32 @@ function renderSpeseMese() {
       <div class="pross-importo"><span>${eur.format(s.importo)}</span></div>
     </div>`).join('') : '<p class="muted">Nessuna spesa fissa in questo mese.</p>';
   $('#sf-succ').disabled = k >= ymAdd(ym(oggiRoma()), 24);
+  renderCarteMese(k);
+}
+
+// Riquadro "Addebiti delle carte" del mese: importo = totale dell'estratto, non sommato alle spese fisse
+function renderCarteMese(k) {
+  const voci = vociCarte().filter(s => attivaNelMese(s, k)).map(s => cartaDelMese(s, k)).filter(s => s.importo !== 0);
+  const box = $('#sf-carte');
+  if (!voci.length) { box.hidden = true; return; }
+  voci.sort((a, b) => (a.giorno ?? 99) - (b.giorno ?? 99));
+  const abb = abbinaMese(k, voci);
+  const tot = voci.reduce((t, s) => t + (s.importo || 0), 0);
+  const manca = voci.some(s => s.importo == null);
+  box.hidden = false;
+  box.innerHTML = `
+    <div class="sf-carte-head"><h3>Addebiti carte</h3><span>${voci.every(s => s.importo == null) ? '–' : eur.format(tot)}${manca ? `<small>${voci.every(s => s.importo == null) ? 'estratti' : 'più gli estratti'} non ancora caricati</small>` : ''}</span></div>
+    ${voci.map(s => { const st = statoVoce(s, k, abb); return `
+    <div class="pross-riga sf-riga" data-sf="${s.id}" role="button" tabindex="0">
+      <i class="dot" style="background:var(${TIPI_SF.carta.colore})"></i>
+      <div class="pross-desc">
+        <div><strong>${esc(s.nome)}</strong></div>
+        <div class="pross-date">giorno ${s.giorno} · ${PAGAMENTI_SF[s.pagamento]}</div>
+        <div class="sf-stato ${st.cls}">${st.testo}</div>
+      </div>
+      <div class="pross-importo"><span>${s.importo == null ? '–' : eur.format(s.importo)}</span></div>
+    </div>`; }).join('')}
+    <p class="foot muted">Non sommati alle spese fisse: contengono già le spese pagate con le carte (es. Apple Watch, Tatoo, Claude). L’importo è il totale dell’estratto della carta.</p>`;
 }
 const ultimaRata = (s, k) => s.fine && s.frequenza === 'mensile' && ym(s.fine) === k;
 
@@ -211,8 +261,8 @@ function renderSpeseAnni(voci) {
 function renderSpeseElenco(voci) {
   const oggi = oggiRoma();
   $$('#sf-vista button').forEach(b => b.classList.toggle('on', b.dataset.vista === speseVista));
-  const vis = voci.filter(s => !s.virtuale && (speseVista === 'attive' ? !s.fine || s.fine >= oggi : s.fine && s.fine < oggi));
-  const ordine = { mutuo: 0, finanziamento: 1, rate: 2, abbonamento: 3 };
+  const vis = [...voci, ...vociCarte()].filter(s => !s.virtuale && (speseVista === 'attive' ? !s.fine || s.fine >= oggi : s.fine && s.fine < oggi));
+  const ordine = { mutuo: 0, finanziamento: 1, rate: 2, abbonamento: 3, carta: 4 };
   vis.sort((a, b) => ordine[a.tipo] - ordine[b.tipo] || (a.giorno ?? 99) - (b.giorno ?? 99) || b.importo - a.importo || a.nome.localeCompare(b.nome));
   let tipoCorrente = null;
   $('#sf-lista').innerHTML = vis.length ? vis.map(s => {
@@ -220,6 +270,7 @@ function renderSpeseElenco(voci) {
     const intest = s.tipo !== tipoCorrente ? `<h3 class="sf-gruppo">${TIPI_SF[s.tipo].nome}</h3>` : '';
     tipoCorrente = s.tipo;
     const quando = s.frequenza === 'annuale' ? `ogni anno, ${s.giorno ?? '?'} ${MESI_LUNGHI[s.mese - 1] ?? ''}` : `ogni mese, giorno ${s.giorno ?? '?'}`;
+    if (s.tipo === 'carta') return `${intest}${rigaCartaElenco(s)}`;
     const fine = s.fine ? (s.fine < oggi ? `finita a ${ymNome(ym(s.fine))}` : `fino a ${ymNome(ym(s.fine))}${n != null ? ` · ${n} ${n === 1 ? 'rata' : 'rate'}, ${eur0.format(n * s.importo)} da pagare` : ''}`) : 'senza scadenza';
     return `${intest}
     <div class="pross-riga sf-riga" data-sf="${s.id}" role="button" tabindex="0">
@@ -235,13 +286,30 @@ function renderSpeseElenco(voci) {
   }).join('') : `<p class="muted">${speseVista === 'attive' ? 'Nessuna spesa attiva.' : 'Nessuna spesa conclusa.'}</p>`;
 }
 
+// Nell'elenco la carta mostra l'ultimo addebito trovato sul conto
+function rigaCartaElenco(s) {
+  const parole = (s.cerca || '').split('|').map(p => p.trim()).filter(Boolean);
+  const ultimo = (typeof movimenti !== 'undefined' ? movimenti : []).filter(m => m.fonte === s.pagamento && m.importo < 0 && parole.some(p => norm(m.descrizione).includes(p)))
+    .reduce((u, m) => !u || m.data > u.data ? m : u, null);
+  return `
+    <div class="pross-riga sf-riga" data-sf="${s.id}" role="button" tabindex="0">
+      <i class="dot" style="background:var(${TIPI_SF.carta.colore})"></i>
+      <div class="pross-desc">
+        <div><strong>${esc(s.nome)}</strong>${s.creditore ? ` <span class="muted">· ${esc(s.creditore)}</span>` : ''}</div>
+        <div class="pross-date">ogni mese, giorno ${s.giorno ?? '?'} · ${s.pagamento ? PAGAMENTI_SF[s.pagamento] : 'conto ?'} · estratto ${s.mese_estratto ? 'del mese prima' : 'dello stesso mese'}</div>
+        <div class="pross-inv">${ultimo ? `ultimo addebito il ${fmtGiorno(ultimo.data)}` : 'nessun addebito trovato'}</div>
+      </div>
+      <div class="pross-importo"><span>${ultimo ? eur.format(-ultimo.importo) : '–'}</span><small>variabile</small></div>
+    </div>`;
+}
+
 /* ---------- Eventi ---------- */
 
 $('#sf-prec').addEventListener('click', () => { speseMese = ymAdd(speseMese, -1); renderSpeseMese(); });
 $('#sf-succ').addEventListener('click', () => { speseMese = ymAdd(speseMese, 1); renderSpeseMese(); });
 $('#sf-oggi').addEventListener('click', () => { speseMese = ym(oggiRoma()); renderSpeseMese(); });
 $('#sf-vista').addEventListener('click', e => { const v = e.target.closest('[data-vista]')?.dataset.vista; if (v) { speseVista = v; renderSpeseElenco(tutteLeVoci()); } });
-for (const sel of ['#sf-mese-lista', '#sf-lista']) {
+for (const sel of ['#sf-mese-lista', '#sf-carte', '#sf-lista']) {
   const apri = e => { const id = e.target.closest('[data-sf]')?.dataset.sf; if (id) apriSpesa(spese.find(s => s.id === id)); };
   $(sel).addEventListener('click', apri);
   $(sel).addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); apri(e); } });
@@ -250,13 +318,18 @@ for (const sel of ['#sf-mese-lista', '#sf-lista']) {
 /* ---------- Finestra spesa ---------- */
 
 const sfDlg = $('#sf-dialog'), sfForm = $('#sf-form');
-const SF_CAMPI = ['nome', 'tipo', 'creditore', 'pagamento', 'importo', 'frequenza', 'giorno', 'mese', 'inizio', 'fine', 'cerca', 'note'];
+const SF_CAMPI = ['nome', 'tipo', 'creditore', 'pagamento', 'importo', 'frequenza', 'giorno', 'mese', 'inizio', 'fine', 'cerca', 'note', 'estratto_carta', 'mese_estratto'];
 let sfId = null;
 
 function sfAggiorna() {
   const annuale = sfForm.elements.frequenza.value === 'annuale';
   $$('.solo-annuale', sfForm).forEach(el => el.hidden = !annuale);
   sfForm.elements.mese.required = annuale;
+  const carta = sfForm.elements.tipo.value === 'carta';
+  $$('.solo-carta', sfForm).forEach(el => el.hidden = !carta);
+  $$('.non-carta', sfForm).forEach(el => el.hidden = carta);
+  sfForm.elements.importo.required = !carta;
+  sfForm.elements.estratto_carta.required = carta;
 }
 
 function apriSpesa(s = null) {
@@ -265,7 +338,7 @@ function apriSpesa(s = null) {
   $('#sf-message').textContent = '';
   $('#sf-delete-btn').hidden = !s;
   $('#sf-title').textContent = s ? `Modifica ${s.nome}` : 'Nuova spesa fissa';
-  const v = s || { tipo: 'abbonamento', frequenza: 'mensile', pagamento: 'conto_hb' };
+  const v = s || { tipo: 'abbonamento', frequenza: 'mensile', pagamento: 'conto_hb', mese_estratto: 0 };
   for (const c of SF_CAMPI) sfForm.elements[c].value = v[c] ?? '';
   sfAggiorna();
   sfDlg.showModal();
@@ -273,12 +346,14 @@ function apriSpesa(s = null) {
 
 $('#sf-add-btn').addEventListener('click', () => apriSpesa());
 sfForm.elements.frequenza.addEventListener('change', sfAggiorna);
+sfForm.elements.tipo.addEventListener('change', sfAggiorna);
 sfDlg.querySelector('[data-close]').addEventListener('click', () => sfDlg.close());
 sfForm.addEventListener('submit', async e => {
   e.preventDefault();
   const r = {};
-  for (const c of SF_CAMPI) { const v = sfForm.elements[c].value.trim(); r[c] = v === '' ? null : (['importo', 'giorno', 'mese'].includes(c) ? Number(v) : v); }
+  for (const c of SF_CAMPI) { const v = sfForm.elements[c].value.trim(); r[c] = v === '' ? null : (['importo', 'giorno', 'mese', 'mese_estratto'].includes(c) ? Number(v) : v); }
   if (r.frequenza !== 'annuale') r.mese = null;
+  if (r.tipo === 'carta') { r.importo = 0; r.frequenza = 'mensile'; r.mese = null; } else { r.estratto_carta = null; r.mese_estratto = 0; }
   if (r.cerca) r.cerca = r.cerca.toUpperCase();
   if (r.inizio && r.fine && r.fine < r.inizio) { $('#sf-message').textContent = 'L’ultima rata è prima della prima.'; return; }
   $('#sf-message').textContent = 'Salvataggio…';

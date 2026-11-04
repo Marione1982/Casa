@@ -101,8 +101,11 @@ function lavorativoPrima(iso) { while (festivo(iso)) iso = piuGiorni(iso, -1); r
 const dataStipendio = (st, k) => lavorativoPrima(`${k}-${String(k.endsWith('-12') ? GIORNO_DICEMBRE : st.giorno).padStart(2, '0')}`);
 const movStipendio = st => listaMov().filter(m => m.fonte === 'conto_hb' && m.importo > 0 && m.categoria === 'Stipendi' && norm(m.descrizione).includes(st.cerca));
 
-// Importo atteso: mediana degli ultimi 6 mesi (escluso dicembre), prendendo per ogni mese l'accredito più alto
-function importoStipendio(st) {
+// Importo atteso. MetLife: dalle buste paga (stipendio.js: netto della busta del mese k se c'è già, altrimenti
+// netto tipico più 14ª a giugno e 13ª a dicembre). Altrimenti (e per il Ministero): mediana degli ultimi 6 mesi
+// (escluso dicembre), prendendo per ogni mese l'accredito più alto.
+function importoStipendio(st, k = null) {
+  if (st.id === 'metlife' && typeof nettoMetlife === 'function') { const v = nettoMetlife(k); if (v) return v; }
   const perMese = {};
   for (const m of movStipendio(st)) { const k = ym(m.data); if (!k.endsWith('-12')) perMese[k] = Math.max(perMese[k] || 0, m.importo); }
   const ultimi = Object.keys(perMese).sort().slice(-6).map(k => perMese[k]);
@@ -237,7 +240,7 @@ function periodiStipendio(base) {
     const k = ymAdd(ym(piuGiorni(base, 1)), i);
     for (const st of STIPENDI) {
       const d = dataStipendio(st, k);
-      if (d > base && !stipendioArrivato(st, k)) eventi.push({ data: d, st, importo: importoStipendio(st) });
+      if (d > base && !stipendioArrivato(st, k)) eventi.push({ data: d, st, importo: importoStipendio(st, k) });
     }
   }
   eventi.sort((a, b) => a.data.localeCompare(b.data));
@@ -337,7 +340,7 @@ function renderBudgetMese(k, stats) {
   const oggi = oggiRoma(), b = budgetDel(k);
   const nome = ymNome(k);
   $('#bg-mese-titolo').textContent = nome.replace(/^./, c => c.toUpperCase());
-  const entrate = sommaImp(STIPENDI, importoStipendio);
+  const entrate = sommaImp(STIPENDI, st => importoStipendio(st));
   const fisse = fisseDelMese(k) + bolletteMediaMese();
   const v = variabiliDelMese(k), r = risparmioDelMese(k);
   const giorniMese = ultimoGiorno(k), oggiG = Number(oggi.slice(8));
@@ -424,7 +427,7 @@ $('#bg-vista').addEventListener('click', e => { const v = e.target.closest('[dat
 const bgDlg = $('#bg-dialog'), bgForm = $('#bg-form');
 function apriBudget() {
   const k = ym(oggiRoma()), b = budgetDel(k), stats = statsVariabili();
-  const entrate = sommaImp(STIPENDI, importoStipendio), fisse = fisseDelMese(k) + bolletteMediaMese();
+  const entrate = sommaImp(STIPENDI, st => importoStipendio(st)), fisse = fisseDelMese(k) + bolletteMediaMese();
   bgForm.reset();
   bgForm.elements.tetto_variabili.value = b ? b.tetto_variabili : Math.round(stats.mediana / 50) * 50;
   bgForm.elements.obiettivo_risparmio.value = b?.obiettivo_risparmio ?? Math.max(0, Math.floor((entrate - fisse - Number(bgForm.elements.tetto_variabili.value)) / 50) * 50);

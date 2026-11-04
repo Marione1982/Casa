@@ -98,6 +98,7 @@ async function caricaDati() {
   if (typeof caricaMovimenti === 'function') caricaMovimenti();   // sezione Movimenti (movimenti.js)
   if (typeof caricaSpese === 'function') caricaSpese();           // sezione Spese fisse (spese.js)
   if (typeof caricaBudget === 'function') caricaBudget();         // sezione Budget (budget.js)
+  if (typeof caricaStipendio === 'function') caricaStipendio();   // sezione Stipendio (stipendio.js)
 }
 
 // Bimestri del fotovoltaico arricchiti con il prelievo dalla bolletta luce dello stesso nome
@@ -506,6 +507,7 @@ $$('.section-tab').forEach(tab => tab.addEventListener('click', () => {
   if (tab.dataset.section === 'condominio' && currentUser) renderCondominio();
   if (tab.dataset.section === 'spese' && currentUser && typeof renderSpese === 'function') renderSpese();
   if (tab.dataset.section === 'budget' && currentUser && typeof renderBudget === 'function') renderBudget();
+  if (tab.dataset.section === 'stipendio' && currentUser && typeof renderStipendioSezione === 'function') renderStipendioSezione();
 }));
 
 // Ridisegna i grafici quando cambia il tema chiaro/scuro

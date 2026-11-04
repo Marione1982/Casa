@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="styles.css?v=20261104-fv-mesi" />
+    <link rel="stylesheet" href="styles.css?v=20261104-stipendio" />
   </head>
   <body>
     <!-- Accesso -->
@@ -37,6 +37,7 @@
           <button class="section-tab" data-section="movimenti">Movimenti</button>
           <button class="section-tab" data-section="spese">Spese fisse</button>
           <button class="section-tab" data-section="budget">Budget</button>
+          <button class="section-tab" data-section="stipendio">Stipendio</button>
         </nav>
         <button id="logout-btn" class="btn ghost small" type="button">Esci</button>
       </header>
@@ -326,6 +327,74 @@
             <p class="foot muted" id="bg-storico-foot"></p>
           </article>
         </section>
+
+        <!-- Sezione Stipendio -->
+        <section id="section-stipendio" class="section" hidden>
+          <div class="section-head">
+            <div>
+              <h1>Stipendio</h1>
+              <p class="muted" id="st-period">Buste paga MetLife</p>
+            </div>
+          </div>
+
+          <div class="kpis" id="st-kpis"></div>
+
+          <article class="card">
+            <header class="card-head">
+              <h2>Mese per mese</h2>
+              <div class="segmented small" id="st-misura">
+                <button type="button" data-misura="netto" class="on">Netto</button>
+                <button type="button" data-misura="lordo">Lordo</button>
+              </div>
+            </header>
+            <div class="legend" id="st-legend"></div>
+            <div class="chart-box tall"><canvas id="chart-st-mesi" aria-label="Stipendio mese per mese, anni a confronto"></canvas></div>
+            <p class="foot muted">Solo le buste del mese: tredicesima e quattordicesima sono a parte. Il netto non comprende i rimborsi del 730. I picchi di marzo sono i premi.</p>
+          </article>
+
+          <article class="card">
+            <header class="card-head">
+              <h2>Dove va il lordo</h2>
+              <div class="legend" id="st-lordo-legend"></div>
+            </header>
+            <div class="chart-box"><canvas id="chart-st-anni" aria-label="Lordo diviso in netto, tasse e contributi per anno"></canvas></div>
+            <div class="table-scroll"><table class="years" id="st-anni"></table></div>
+            <p class="foot muted" id="st-anni-foot"></p>
+          </article>
+
+          <article class="card">
+            <header class="card-head">
+              <h2>Extra e benefit</h2>
+              <select id="st-extra-anno" aria-label="Anno"></select>
+            </header>
+            <div>
+              <h3 class="st-h3">In busta</h3>
+              <div id="st-extra" class="cat-lista"></div>
+            </div>
+            <div>
+              <h3 class="st-h3">Benefit pagati dall’azienda (non arrivano in busta)</h3>
+              <div id="st-benefit" class="cat-lista"></div>
+            </div>
+            <p class="foot muted">Somme dell’anno, voce per voce. I benefit (buoni pasto, auto, welfare, fondo pensione…) non sono nel netto ma hanno un valore.</p>
+          </article>
+
+          <article class="card">
+            <header class="card-head">
+              <h2>Paga base</h2>
+              <span class="muted small-text" id="st-base-sotto"></span>
+            </header>
+            <div class="chart-box mini"><canvas id="chart-st-base" aria-label="Paga base nel tempo"></canvas></div>
+          </article>
+
+          <article class="card">
+            <header class="card-head">
+              <h2>Buste paga</h2>
+              <select id="st-anno" aria-label="Anno"></select>
+            </header>
+            <div id="st-lista" class="st-lista"></div>
+            <p class="foot muted">Tocca una busta per il dettaglio. L’accredito viene cercato nei Movimenti del conto Hello.</p>
+          </article>
+        </section>
       </main>
     </div>
 
@@ -538,10 +607,11 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script src="supabase-config.js"></script>
-    <script src="app.js?v=20261104-fv-mesi"></script>
+    <script src="app.js?v=20261104-stipendio"></script>
     <script src="movimenti.js?v=20261103-7"></script>
     <script src="prossime.js?v=20261103-3"></script>
     <script src="spese.js?v=20261104-1"></script>
-    <script src="budget.js?v=20261104-2"></script>
+    <script src="budget.js?v=20261104-3"></script>
+    <script src="stipendio.js?v=20261104-1"></script>
   </body>
 </html>

@@ -421,3 +421,23 @@ label.check input { width: auto; }
 .mini-riga.mini-fv { grid-template-columns: 1fr auto; }
 .mini-riga.mini-fv sup { font-size: 10px; color: var(--text-3); margin-left: 1px; }
 #fv-anni th + th, #fv-anni td + td { padding-left: 8px; }
+
+/* Stipendio */
+.st-h3 { font-size: 13px; margin: 0 0 6px; color: var(--text-2); font-weight: 600; }
+.st-voce .barra i { background: var(--ord); }
+.st-voce.neg .barra i { background: var(--uscite); }
+#st-benefit .st-voce .barra i { background: var(--str); }
+.st-lista { display: grid; }
+.st-busta { border-bottom: 1px solid var(--grid); }
+.st-busta:last-child { border-bottom: 0; }
+.st-busta summary { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; align-items: baseline; padding: 10px 4px; cursor: pointer; list-style: none; border-radius: 8px; }
+.st-busta summary::-webkit-details-marker { display: none; }
+.st-busta summary:hover { background: var(--surface-2); }
+.st-busta .st-nome { font-weight: 600; }
+.st-busta .num { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+.st-busta .st-sotto { grid-column: 1 / -1; font-size: 12.5px; color: var(--text-3); }
+.st-ok { color: var(--ord); }
+.st-ko { color: var(--da-pagare); }
+.st-dett { display: grid; gap: 12px; padding: 4px 4px 14px; }
+.st-dett .mini-riga small { display: inline; margin-left: 4px; }
+.mini-riga.st-tot { font-weight: 700; }

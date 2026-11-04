@@ -101,7 +101,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 /* Accesso */
 .auth { min-height: 100vh; display: grid; place-items: center; padding: 24px 16px; }
 .auth-card { width: min(380px, 100%); background: var(--surface); border: 1px solid var(--border); border-radius: 18px; padding: 28px 24px; box-shadow: var(--shadow); }
-.stack { display: grid; gap: 12px; }
+.stack { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
 label { display: grid; gap: 4px; font-size: 13px; font-weight: 500; color: var(--text-2); }
 input, select, textarea {
   width: 100%; padding: 9px 11px; border-radius: 10px; border: 1px solid var(--border);
@@ -131,7 +131,7 @@ input, select, textarea {
 .section-tab.active { background: var(--surface-2); color: var(--text); }
 
 main { max-width: 1100px; margin: 0 auto; padding: 20px 16px 48px; }
-.section { display: grid; gap: 16px; }
+.section { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
 .section-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
 .section-head p { margin: 4px 0 0; }
 
@@ -153,10 +153,11 @@ main { max-width: 1100px; margin: 0 auto; padding: 20px 16px 48px; }
 .kpi .sub { font-size: 13px; color: var(--text-3); margin-top: 2px; }
 
 /* Card */
-.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow); display: grid; gap: 12px; min-width: 0; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow); display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; min-width: 0; }
 .card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
 .card-head select { width: auto; padding: 6px 10px; font-size: 14px; }
-.chart-box { position: relative; height: 260px; }
+.chart-box { position: relative; height: 260px; min-width: 0; }
+.chart-box canvas { max-width: 100%; }
 .chart-box.tall { height: 300px; }
 .chart-box.mini { height: 150px; }
 .foot { font-size: 13px; margin: 0; }

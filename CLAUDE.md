@@ -6,6 +6,7 @@ Webapp in italiano per i conti di casa e famiglia, a sezioni. Sezione attiva: **
 ## Stack
 - HTML, CSS e JavaScript puro. Nessun build, nessun package manager.
 - `@supabase/supabase-js` 2.118.0 e `chart.js` 4.4.1 da CDN (jsdelivr) in `index.html`.
+- Grafici: i contenitori a griglia (`.section`, `.stack`, `.card`) hanno `grid-template-columns: minmax(0, 1fr)`, altrimenti il canvas di Chart.js impedisce alla colonna di stringersi dopo la rotazione del telefono (pagina sbordata per qualche secondo). Mantenerlo per i nuovi contenitori con grafici.
 - Hosting: GitHub Pages, <https://marione1982.github.io/Casa/> (pubblicato da `.github/workflows/deploy.yml` a ogni push su `main`).
 
 ## File

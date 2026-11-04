@@ -1,7 +1,9 @@
 // Casa – aggiornamento del fotovoltaico da Fox ESS (FoxCloud Open API).
 // Legge produzione lorda (PVEnergyTotal), netta (generation), venduti (feedin) e prelievo dalla rete
 // (gridConsumption) mese per mese
-// e aggiorna casa_fotovoltaico per bimestre. Gira con l'utente che la chiama (RLS attiva):
+// e aggiorna casa_fotovoltaico_mesi (per mese) e casa_fotovoltaico (per bimestre).
+// Con ?storico=1 rilegge tutti gli anni da ottobre 2022 (impianto installato allora).
+// Gira con l'utente che la chiama (RLS attiva):
 // nessuna chiave service_role. La chiave Fox ESS sta solo nel segreto FOXESS_API_KEY.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
@@ -52,6 +54,7 @@ Deno.serve(async (req) => {
     const { data: u, error: ue } = await sb.auth.getUser();
     if (ue || !u?.user) return json({ errore: "Accesso richiesto" }, 401);
     const prova = new URL(req.url).searchParams.get("prova") === "1"; // solo lettura, non scrive
+    const storico = new URL(req.url).searchParams.get("storico") === "1"; // tutti gli anni dal 2022
 
     // Inverter dell'account
     const lista = await fox("/op/v0/device/list", { currentPage: 1, pageSize: 10 });
@@ -61,11 +64,27 @@ Deno.serve(async (req) => {
 
     // Anno in corso, più il precedente a inizio anno (per chiudere novembre-dicembre)
     const oggi = new Date(new Date().toLocaleString("en-US", { timeZone: "Europe/Rome" }));
-    const anni = oggi.getMonth() < 2 ? [oggi.getFullYear() - 1, oggi.getFullYear()] : [oggi.getFullYear()];
+    const anni = storico
+      ? Array.from({ length: oggi.getFullYear() - 2021 }, (_, i) => 2022 + i)
+      : oggi.getMonth() < 2 ? [oggi.getFullYear() - 1, oggi.getFullYear()] : [oggi.getFullYear()];
     const righe: any[] = [];
+    const mesi: any[] = [];
     for (const anno of anni) {
       const res = await fox("/op/v0/device/report/query", { sn, year: anno, dimension: "year", variables: ["PVEnergyTotal", "generation", "feedin", "gridConsumption"] });
       const v = Object.fromEntries((res ?? []).map((x: any) => [x.variable, valori(x)]));
+      for (let m = 0; m < 12; m++) {
+        const netti = r1(v.generation?.[m] ?? 0);
+        if (netti <= 0) continue; // mese senza produzione (prima dell'impianto o futuro)
+        const pv = r1(v.PVEnergyTotal?.[m] ?? 0);
+        mesi.push({
+          user_id: u.user.id,
+          mese: `${anno}-${pad(m + 1)}-01`,
+          kwh_prodotti: pv >= netti ? pv : netti, // dato dei pannelli solo da metà febbraio 2024
+          kwh_netti: netti,
+          kwh_immessi: r1(v.feedin?.[m] ?? 0),
+          kwh_prelevati: v.gridConsumption ? r1(v.gridConsumption[m] ?? 0) : null,
+        });
+      }
       for (let b = 0; b < 6; b++) {
         const m1 = b * 2, m2 = m1 + 1; // indici 0-11
         const netti = r1((v.generation?.[m1] ?? 0) + (v.generation?.[m2] ?? 0));
@@ -82,7 +101,8 @@ Deno.serve(async (req) => {
           kwh_netti: netti,
           kwh_immessi: r1((v.feedin?.[m1] ?? 0) + (v.feedin?.[m2] ?? 0)),
           // prelievo dalla rete: null se Fox ESS non restituisce il dato
-          kwh_prelevati: v.gridConsumption ? r1((v.gridConsumption[m1] ?? 0) + (v.gridConsumption[m2] ?? 0)) : null,
+          // se il primo mese non ha produzione (set-ott 2022, prima dell'impianto) il prelievo è parziale: null
+          kwh_prelevati: v.gridConsumption && (v.generation?.[m1] ?? 0) > 0 ? r1((v.gridConsumption[m1] ?? 0) + (v.gridConsumption[m2] ?? 0)) : null,
         });
       }
       await new Promise((res) => setTimeout(res, 1100));
@@ -101,8 +121,12 @@ Deno.serve(async (req) => {
         if (error) throw error;
         scritti.push(r.codice);
       }
+      if (mesi.length) {
+        const { error } = await sb.from("casa_fotovoltaico_mesi").upsert(mesi, { onConflict: "user_id,mese" });
+        if (error) throw error;
+      }
     }
-    return json({ ok: true, prova, bimestri: righe, scritti });
+    return json({ ok: true, prova, storico, bimestri: righe, mesi, scritti });
   } catch (e) {
     return json({ errore: String((e as Error)?.message ?? e) }, 500);
   }

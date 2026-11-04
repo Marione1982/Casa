@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="styles.css?v=20261104-1" />
+    <link rel="stylesheet" href="styles.css?v=20261104-fv-mesi" />
   </head>
   <body>
     <!-- Accesso -->
@@ -105,7 +105,6 @@
             <header class="card-head">
               <h2><i class="dot fv"></i>Fotovoltaico</h2>
               <div class="head-actions">
-                <button class="btn small" type="button" id="fv-add-btn">+ Bimestre</button>
                 <button class="btn small" type="button" id="gse-add-btn">+ Bonifico GSE</button>
                 <button class="btn small" type="button" id="fox-btn">Aggiorna da Fox ESS</button>
               </div>
@@ -113,14 +112,15 @@
             <p class="foot muted" id="fox-stato">I dati si aggiornano da Fox ESS in automatico quando apri l’app.</p>
             <div class="kpis kpis-fv" id="fv-kpis"></div>
             <p class="foot nota-ast" id="fv-nota" hidden></p>
+            <p class="foot muted" id="fv-nota-inverter" hidden></p>
             <div class="legend" id="legend-fv"></div>
-            <div class="chart-box tall"><canvas id="chart-fv" aria-label="Consumo totale e produzione per bimestre"></canvas></div>
-            <p class="foot muted">Lordo = prodotto dai pannelli (come l’app Fox ESS); netti = uscita dell’inverter, dopo le perdite di conversione e batteria. Autoconsumo = netti − venduti. Consumo totale = prelevato dalla rete (bolletta) + autoconsumo. Prima di marzo 2024 il dato dei pannelli non c’è: lordo = netti.</p>
+            <div class="chart-box tall"><canvas id="chart-fv" aria-label="Consumo totale e produzione mese per mese"></canvas></div>
+            <p class="foot muted">Lordo = prodotto dai pannelli (come l’app Fox ESS); netti = uscita dell’inverter, dopo le perdite di conversione e batteria. Autoconsumo = netti − venduti. Consumo totale = prelevato dalla rete + autoconsumo; il prelievo di ogni mese è quello della bolletta del bimestre, diviso tra i due mesi come lo ha misurato l’inverter. Prima di marzo 2024 il dato dei pannelli non c’è: lordo = netti.</p>
             <div class="table-scroll"><table class="years" id="fv-anni"></table></div>
             <details class="fv-details">
-              <summary>Dettaglio bimestri e bonifici GSE</summary>
+              <summary>Dettaglio mesi e bonifici GSE</summary>
               <div class="fv-cols">
-                <div><h3>Bimestri</h3><div id="fv-lista" class="mini-lista"></div></div>
+                <div><h3>Mesi</h3><div id="fv-lista" class="mini-lista"></div></div>
                 <div><h3>Bonifici GSE</h3><div id="gse-lista" class="mini-lista"></div></div>
               </div>
             </details>
@@ -367,29 +367,6 @@
       </form>
     </dialog>
 
-    <!-- Finestra fotovoltaico -->
-    <dialog id="fv-dialog">
-      <form id="fv-form" method="dialog" class="stack">
-        <h2 id="fv-title">Fotovoltaico</h2>
-        <div class="grid2">
-          <label>Bimestre (nome bolletta luce)<input name="codice" required placeholder="es. 202610" inputmode="numeric" pattern="\d{6}" /></label>
-          <span></span>
-          <label>Periodo dal<input type="date" name="periodo_dal" required /></label>
-          <label>Periodo al<input type="date" name="periodo_al" required /></label>
-          <label>kWh prodotti lordi (pannelli)<input type="number" step="0.1" min="0" name="kwh_prodotti" required /></label>
-          <label>kWh netti (uscita inverter)<input type="number" step="0.1" min="0" name="kwh_netti" placeholder="vuoto = uguale al lordo" /></label>
-          <label>kWh venduti (immessi)<input type="number" step="0.1" min="0" name="kwh_immessi" placeholder="vuoto se non disponibile" /></label>
-        </div>
-        <label>Note<textarea name="note" rows="2"></textarea></label>
-        <p id="fv-message" class="form-message" role="status"></p>
-        <div class="dialog-actions">
-          <button type="button" id="fv-delete-btn" class="btn danger ghost">Elimina</button>
-          <span class="spacer"></span>
-          <button type="button" class="btn ghost" data-close>Annulla</button>
-          <button type="submit" class="btn primary">Salva</button>
-        </div>
-      </form>
-    </dialog>
 
     <!-- Finestra bonifico GSE -->
     <dialog id="gse-dialog">
@@ -561,7 +538,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script src="supabase-config.js"></script>
-    <script src="app.js?v=20261104-1"></script>
+    <script src="app.js?v=20261104-fv-mesi"></script>
     <script src="movimenti.js?v=20261103-7"></script>
     <script src="prossime.js?v=20261103-3"></script>
     <script src="spese.js?v=20261104-1"></script>

@@ -415,3 +415,8 @@ label.check input { width: auto; }
 .sf-dett-lista.esclusi { opacity: 0.75; }
 .sf-dett-tot { display: flex; justify-content: space-between; gap: 12px; font-weight: 700; font-size: 16px; padding: 6px 4px 0; font-variant-numeric: tabular-nums; }
 .sf-dett .sf-gruppo { margin-top: 10px; }
+
+/* Fotovoltaico mese per mese: elenco in sola lettura */
+.mini-riga.mini-fv { grid-template-columns: 1fr auto; }
+.mini-riga.mini-fv sup { font-size: 10px; color: var(--text-3); margin-left: 1px; }
+#fv-anni th + th, #fv-anni td + td { padding-left: 8px; }

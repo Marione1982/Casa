@@ -393,3 +393,25 @@ label.check input { width: auto; }
 .bg-barra.neutro .bg-barra-fondo i { background: var(--rete); }
 .bg-barra-fondo b { position: absolute; top: -4px; bottom: -4px; width: 2px; margin-left: -1px; background: var(--text); border-radius: 1px; }
 .bg-barra-nota { font-size: 13px; color: var(--text-2); }
+
+/* Spese fisse: dettaglio dei riquadri */
+.kpi-tocca { cursor: pointer; transition: border-color 0.15s, box-shadow 0.15s; }
+.kpi-tocca:hover { border-color: var(--text-3); }
+.kpi-tocca:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.kpi-tocca.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.kpi-tocca .label::after { content: ''; margin-left: auto; width: 6px; height: 6px; border-right: 2px solid var(--text-3); border-bottom: 2px solid var(--text-3); transform: rotate(45deg) translateY(-2px); transition: transform 0.2s; }
+.kpi-tocca.on .label::after { transform: rotate(-135deg) translate(-1px, -1px); border-color: var(--accent); }
+.sf-dett { gap: 8px; }
+.sf-dett .card-head .icon-btn { font-size: 16px; }
+.sf-dett-lista { display: grid; }
+.sf-dett-riga { display: grid; grid-template-columns: 10px 1fr auto; gap: 12px; align-items: center; padding: 8px 4px; border-bottom: 1px solid var(--grid); border-radius: 6px; }
+.sf-dett-riga[role="button"] { cursor: pointer; }
+.sf-dett-riga[role="button"]:hover { background: var(--surface-2); }
+.sf-dett-riga[role="button"]:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.sf-dett-nome { min-width: 0; }
+.sf-dett-nome small, .sf-dett-num small { display: block; font-size: 12.5px; color: var(--text-3); margin-top: 1px; }
+.sf-dett-num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.sf-dett-num span { font-weight: 600; }
+.sf-dett-lista.esclusi { opacity: 0.75; }
+.sf-dett-tot { display: flex; justify-content: space-between; gap: 12px; font-weight: 700; font-size: 16px; padding: 6px 4px 0; font-variant-numeric: tabular-nums; }
+.sf-dett .sf-gruppo { margin-top: 10px; }

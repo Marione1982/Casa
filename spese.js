@@ -63,6 +63,7 @@ function attivaNelMese(s, k) {
   if (s.frequenza === 'annuale') return Number(k.slice(5)) === s.mese;
   return true;
 }
+const finoA = k => { const n = ymNome(ym(k)); return `fino a${/^[aeiou]/.test(n) ? 'd' : ''} ${n}`; };
 const ultimoGiorno = k => { const [y, m] = k.split('-').map(Number); return new Date(Date.UTC(y, m, 0)).getUTCDate(); };
 const dataPrevista = (s, k) => s.giorno ? `${k}-${String(Math.min(s.giorno, ultimoGiorno(k))).padStart(2, '0')}` : null;
 const giorniFra = (a, b) => Math.round((toDate(b) - toDate(a)) / 86400000);
@@ -160,11 +161,12 @@ function renderSpese() {
   const daCompletare = voci.filter(s => !s.virtuale && (!s.giorno || !s.pagamento));
   $('#sf-period').textContent = `${attive.length} voci attive${daCompletare.length ? ` · ${daCompletare.length} da completare` : ''}`;
   $('#sf-kpis').innerHTML = `
-    <div class="kpi"><div class="label">Spese fisse al mese</div><div class="value">${eur0.format(somma(mensiliOggi))}</div><div class="sub">${annuali.length ? `più ${eur0.format(somma(annuali))} all’anno di annuali` : 'questo mese'}</div></div>
-    <div class="kpi"><div class="label"><i class="dot" style="background:var(--str)"></i>Finanziamenti e rate</div><div class="value">${eur0.format(perTipo('finanziamento') + perTipo('rate'))}</div><div class="sub">mutuo ${eur0.format(perTipo('mutuo'))} al mese</div></div>
-    <div class="kpi"><div class="label"><i class="dot" style="background:var(--fv)"></i>Abbonamenti</div><div class="value">${eur0.format(perTipo('abbonamento'))}</div><div class="sub">al mese, più condominio ${eur0.format(perTipo('condominio'))}</div></div>
-    <div class="kpi"><div class="label">Debito residuo</div><div class="value">${eur0.format(residuoNoMutuo)}</div><div class="sub">senza mutuo · con mutuo ${eur0.format(residuo)}</div></div>`;
+    <div class="kpi kpi-tocca" data-kpi="tutte" role="button" tabindex="0"><div class="label">Spese fisse al mese</div><div class="value">${eur0.format(somma(mensiliOggi))}</div><div class="sub">${annuali.length ? `più ${eur0.format(somma(annuali))} all’anno di annuali` : 'questo mese'}</div></div>
+    <div class="kpi kpi-tocca" data-kpi="finanz" role="button" tabindex="0"><div class="label"><i class="dot" style="background:var(--str)"></i>Finanziamenti e rate</div><div class="value">${eur0.format(perTipo('finanziamento') + perTipo('rate'))}</div><div class="sub">mutuo ${eur0.format(perTipo('mutuo'))} al mese</div></div>
+    <div class="kpi kpi-tocca" data-kpi="abbon" role="button" tabindex="0"><div class="label"><i class="dot" style="background:var(--fv)"></i>Abbonamenti</div><div class="value">${eur0.format(perTipo('abbonamento'))}</div><div class="sub">al mese, più condominio ${eur0.format(perTipo('condominio'))}</div></div>
+    <div class="kpi kpi-tocca" data-kpi="debito" role="button" tabindex="0"><div class="label">Debito residuo</div><div class="value">${eur0.format(residuoNoMutuo)}</div><div class="sub">senza mutuo · con mutuo ${eur0.format(residuo)}</div></div>`;
 
+  renderKpiDettaglio();
   renderSpeseMese();
   renderSpeseAnni(voci);
   renderSpeseElenco(voci);
@@ -272,7 +274,7 @@ function renderSpeseElenco(voci) {
     tipoCorrente = s.tipo;
     const quando = s.frequenza === 'annuale' ? `ogni anno, ${s.giorno ?? '?'} ${MESI_LUNGHI[s.mese - 1] ?? ''}` : `ogni mese, giorno ${s.giorno ?? '?'}`;
     if (s.tipo === 'carta') return `${intest}${rigaCartaElenco(s)}`;
-    const fine = s.fine ? (s.fine < oggi ? `finita a ${ymNome(ym(s.fine))}` : `fino a ${ymNome(ym(s.fine))}${n != null ? ` · ${n} ${n === 1 ? 'rata' : 'rate'}, ${eur0.format(n * s.importo)} da pagare` : ''}`) : 'senza scadenza';
+    const fine = s.fine ? (s.fine < oggi ? `finita a ${ymNome(ym(s.fine))}` : `${finoA(s.fine)}${n != null ? ` · ${n} ${n === 1 ? 'rata' : 'rate'}, ${eur0.format(n * s.importo)} da pagare` : ''}`) : 'senza scadenza';
     return `${intest}
     <div class="pross-riga sf-riga" data-sf="${s.id}" role="button" tabindex="0">
       <i class="dot" style="background:var(${TIPI_SF[s.tipo].colore})"></i>
@@ -304,13 +306,78 @@ function rigaCartaElenco(s) {
     </div>`;
 }
 
+/* ---------- Dettaglio dei riquadri in alto ---------- */
+
+let sfKpi = null;   // riquadro aperto: tutte / finanz / abbon / debito
+const residuoDi = s => { const n = rateRimaste(s); return n == null ? null : { n, tot: Math.round(n * s.importo * 100) / 100 }; };
+// Ordine: debito residuo più alto prima; le voci senza scadenza dopo, per importo
+const perResiduo = l => l.map(s => ({ s, res: residuoDi(s) }))
+  .sort((a, b) => (b.res?.tot ?? -1) - (a.res?.tot ?? -1) || b.s.importo - a.s.importo || a.s.nome.localeCompare(b.s.nome));
+
+function datiKpi(tipo) {
+  const oggi = oggiRoma(), k = ym(oggi);
+  const voci = tutteLeVoci();
+  const mensili = voci.filter(s => attivaNelMese(s, k) && s.frequenza === 'mensile');
+  const annuali = voci.filter(s => s.frequenza === 'annuale' && (!s.fine || s.fine >= oggi));
+  const conRate = voci.filter(s => ['mutuo', 'finanziamento', 'rate'].includes(s.tipo) && s.fine && s.fine >= oggi);
+  const di = t => l => l.filter(s => t.includes(s.tipo));
+  switch (tipo) {
+    case 'tutte': return { titolo: `Spese fisse di ${ymNome(k)}`, righe: perResiduo(mensili), esclusi: perResiduo(annuali), titoloEsclusi: 'Annuali, non inclusi' };
+    case 'finanz': return { titolo: 'Finanziamenti e rate del mese', righe: perResiduo(di(['finanziamento', 'rate'])(mensili)), esclusi: perResiduo(di(['mutuo'])(mensili)), titoloEsclusi: 'Mutuo, non incluso' };
+    case 'abbon': return { titolo: 'Abbonamenti del mese', righe: perResiduo(di(['abbonamento'])(mensili)), esclusi: perResiduo([...di(['condominio'])(mensili), ...di(['abbonamento'])(annuali)]), titoloEsclusi: 'Non inclusi' };
+    case 'debito': return { titolo: 'Debito residuo', debito: true, righe: perResiduo(di(['finanziamento', 'rate'])(conRate)), esclusi: perResiduo(di(['mutuo'])(conRate)), titoloEsclusi: 'Mutuo, non incluso' };
+  }
+}
+
+function rigaKpi({ s, res }, debito) {
+  const giorno = s.frequenza === 'annuale' ? `${s.giorno ?? '?'} ${MESI_LUNGHI[s.mese - 1] ?? ''}` : `giorno ${s.giorno ?? '?'}`;
+  const fine = s.fine ? finoA(s.fine) : 'senza scadenza';
+  const principale = debito ? res.tot : s.importo;
+  const sotto = debito ? `${res.n} × ${eur.format(s.importo)}` : res ? `resta ${eur0.format(res.tot)}` : (s.frequenza === 'annuale' ? 'all’anno' : 'al mese');
+  return `
+    <div class="sf-dett-riga" ${s.virtuale ? '' : `data-sf="${s.id}" role="button" tabindex="0"`}>
+      <i class="dot" style="background:var(${TIPI_SF[s.tipo].colore})"></i>
+      <div class="sf-dett-nome"><strong>${esc(s.nome)}</strong>${s.creditore ? ` <span class="muted">· ${esc(s.creditore)}</span>` : ''}<small>${giorno} · ${fine}${res && !debito ? ` · ${res.n} ${res.n === 1 ? 'rata' : 'rate'}` : ''}</small></div>
+      <div class="sf-dett-num"><span>${eur.format(principale)}</span><small>${sotto}</small></div>
+    </div>`;
+}
+
+function renderKpiDettaglio() {
+  $$('#sf-kpis [data-kpi]').forEach(el => { el.classList.toggle('on', el.dataset.kpi === sfKpi); el.setAttribute('aria-expanded', el.dataset.kpi === sfKpi); });
+  const box = $('#sf-kpi-dett');
+  if (!sfKpi) { box.hidden = true; return; }
+  const d = datiKpi(sfKpi);
+  const val = x => d.debito ? x.res.tot : x.s.importo;
+  const tot = d.righe.reduce((t, x) => t + val(x), 0);
+  const totEsclusi = d.esclusi.reduce((t, x) => t + val(x), 0);
+  box.hidden = false;
+  box.innerHTML = `
+    <header class="card-head"><h2>${d.titolo}</h2><button class="icon-btn" type="button" data-chiudi aria-label="Chiudi">✕</button></header>
+    <div class="sf-dett-lista">${d.righe.length ? d.righe.map(x => rigaKpi(x, d.debito)).join('') : '<p class="muted">Nessuna voce.</p>'}</div>
+    <div class="sf-dett-tot"><span>Totale${d.debito ? '' : ' al mese'}</span><span>${eur.format(tot)}</span></div>
+    ${d.esclusi.length ? `
+    <h3 class="sf-gruppo">${d.titoloEsclusi}</h3>
+    <div class="sf-dett-lista esclusi">${d.esclusi.map(x => rigaKpi(x, d.debito)).join('')}</div>
+    ${d.debito ? `<div class="sf-dett-tot"><span>Totale con mutuo</span><span>${eur.format(tot + totEsclusi)}</span></div>` : ''}` : ''}
+    <p class="foot muted">${d.debito ? 'Rate che mancano × importo della rata: è quanto pagherai ancora, interessi e spese compresi (il capitale da restituire per un’estinzione anticipata è più basso).' : 'In ordine di debito residuo; le voci senza scadenza in fondo, per importo.'} Tocca una voce per modificarla.</p>`;
+}
+
+function apriKpi(el) {
+  if (!el) return;
+  sfKpi = sfKpi === el.dataset.kpi ? null : el.dataset.kpi;
+  renderKpiDettaglio();
+}
+$('#sf-kpis').addEventListener('click', e => apriKpi(e.target.closest('[data-kpi]')));
+$('#sf-kpis').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); apriKpi(e.target.closest('[data-kpi]')); } });
+$('#sf-kpi-dett').addEventListener('click', e => { if (e.target.closest('[data-chiudi]')) { sfKpi = null; renderKpiDettaglio(); } });
+
 /* ---------- Eventi ---------- */
 
 $('#sf-prec').addEventListener('click', () => { speseMese = ymAdd(speseMese, -1); renderSpeseMese(); });
 $('#sf-succ').addEventListener('click', () => { speseMese = ymAdd(speseMese, 1); renderSpeseMese(); });
 $('#sf-oggi').addEventListener('click', () => { speseMese = ym(oggiRoma()); renderSpeseMese(); });
 $('#sf-vista').addEventListener('click', e => { const v = e.target.closest('[data-vista]')?.dataset.vista; if (v) { speseVista = v; renderSpeseElenco(tutteLeVoci()); } });
-for (const sel of ['#sf-mese-lista', '#sf-carte', '#sf-lista']) {
+for (const sel of ['#sf-kpi-dett', '#sf-mese-lista', '#sf-carte', '#sf-lista']) {
   const apri = e => { const id = e.target.closest('[data-sf]')?.dataset.sf; if (id) apriSpesa(spese.find(s => s.id === id)); };
   $(sel).addEventListener('click', apri);
   $(sel).addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); apri(e); } });

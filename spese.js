@@ -168,6 +168,7 @@ function renderSpese() {
   renderSpeseMese();
   renderSpeseAnni(voci);
   renderSpeseElenco(voci);
+  if (typeof renderBudget === 'function') renderBudget();   // il budget dipende da spese fisse e movimenti
 }
 
 function renderSpeseMese() {

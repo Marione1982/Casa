@@ -366,3 +366,30 @@ label.check input { width: auto; }
 .sf-carte-head span { font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; }
 .sf-carte-head small { display: block; font-size: 12px; font-weight: 500; color: var(--text-3); }
 .sf-carte .foot { margin-top: 8px; }
+
+/* Budget */
+.bg-stip .card-head { align-items: flex-start; }
+.kpi.bg-verde .value { color: var(--ord); }
+.kpi.bg-rosso .value { color: var(--danger); }
+.bg-saldo-vuoto .value { color: var(--text-3); }
+.link-btn { border: 0; background: none; padding: 0; color: var(--accent); font: inherit; font-weight: 600; text-decoration: underline; cursor: pointer; }
+.testo-rosso { color: var(--danger); }
+.bg-periodo { border-top: 1px solid var(--border); padding-top: 10px; margin-top: 4px; }
+.bg-periodo summary { list-style: none; cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.bg-periodo summary::-webkit-details-marker { display: none; }
+.bg-periodo summary::after { content: '›'; color: var(--text-3); font-size: 20px; transition: transform 0.15s; }
+.bg-periodo[open] summary::after { transform: rotate(90deg); }
+.bg-periodo summary > span:first-child { display: grid; gap: 2px; min-width: 0; flex: 1; }
+.bg-periodo summary small { font-size: 12.5px; color: var(--text-3); }
+.bg-periodo-num { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.bg-periodo-num small { display: block; font-weight: 500; }
+.bg-periodo .pross-lista { margin-top: 6px; }
+#bg-barre { display: grid; gap: 16px; }
+.bg-barra-head { display: flex; justify-content: space-between; gap: 10px; font-variant-numeric: tabular-nums; }
+.bg-barra-fondo { position: relative; height: 14px; border-radius: 7px; background: var(--surface-2); margin: 6px 0 4px; }
+.bg-barra-fondo i { display: block; height: 100%; border-radius: 7px; background: var(--ord); }
+.bg-barra.giallo .bg-barra-fondo i { background: var(--da-pagare); }
+.bg-barra.rosso .bg-barra-fondo i { background: var(--danger); }
+.bg-barra.neutro .bg-barra-fondo i { background: var(--rete); }
+.bg-barra-fondo b { position: absolute; top: -4px; bottom: -4px; width: 2px; margin-left: -1px; background: var(--text); border-radius: 1px; }
+.bg-barra-nota { font-size: 13px; color: var(--text-2); }

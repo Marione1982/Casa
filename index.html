@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="styles.css?v=20261103-8" />
+    <link rel="stylesheet" href="styles.css?v=20261104-1" />
   </head>
   <body>
     <!-- Accesso -->
@@ -282,7 +282,48 @@
           </article>
         </section>
         <section id="section-budget" class="section" hidden>
-          <div class="empty-state"><h1>Budget</h1><p class="muted">In arrivo: entrate, uscite e disponibilità del mese.</p></div>
+          <div class="section-head">
+            <div>
+              <h1>Budget</h1>
+              <p class="muted" id="bg-period">Spese variabili, risparmio e disponibilità fino allo stipendio</p>
+            </div>
+            <button id="bg-imposta-btn" class="btn primary" type="button">Imposta budget</button>
+          </div>
+
+          <article class="card bg-stip">
+            <header class="card-head">
+              <div>
+                <h2 id="bg-stip-titolo">Fino allo stipendio</h2>
+                <p class="muted small-text" id="bg-stip-sotto"></p>
+              </div>
+              <button id="bg-saldo-btn" class="btn ghost small" type="button">Aggiorna saldo</button>
+            </header>
+            <div class="kpis kpis-fv bg-stip-kpis" id="bg-stip-kpis"></div>
+            <div id="bg-stip-lista" class="pross-lista"></div>
+            <div id="bg-stip-dopo"></div>
+            <p class="foot muted" id="bg-stip-foot"></p>
+          </article>
+
+          <article class="card">
+            <header class="card-head">
+              <h2 id="bg-mese-titolo">Questo mese</h2>
+            </header>
+            <div class="kpis kpis-fv" id="bg-mese-kpis"></div>
+            <div id="bg-barre"></div>
+            <p class="foot muted" id="bg-mese-foot"></p>
+          </article>
+
+          <article class="card">
+            <header class="card-head">
+              <h2>Mese per mese</h2>
+              <div class="segmented small" id="bg-vista">
+                <button type="button" data-vista="variabili" class="on">Spese variabili</button>
+                <button type="button" data-vista="risparmio">Risparmio</button>
+              </div>
+            </header>
+            <div class="chart-box"><canvas id="chart-bg" aria-label="Spese variabili e risparmio mese per mese"></canvas></div>
+            <p class="foot muted" id="bg-storico-foot"></p>
+          </article>
         </section>
       </main>
     </div>
@@ -477,12 +518,49 @@
       </form>
     </dialog>
 
+    <dialog id="bg-dialog">
+      <form id="bg-form" method="dialog" class="stack">
+        <h2>Budget</h2>
+        <div class="grid2">
+          <label>Tetto spese variabili €/mese<input type="number" step="1" min="0" name="tetto_variabili" required /></label>
+          <label>Obiettivo di risparmio €/mese<input type="number" step="1" min="0" name="obiettivo_risparmio" required /></label>
+          <label>Vale da<input type="month" name="valido_dal" required /></label>
+        </div>
+        <div class="mov-info" id="bg-dialog-info"></div>
+        <p class="muted small-text">Le spese variabili sono tutte le uscite tranne spese fisse, bollette, condominio, rate e abbonamenti. Se cambi il tetto, i mesi precedenti restano confrontati con quello di allora.</p>
+        <p id="bg-message" class="form-message" role="status"></p>
+        <div class="dialog-actions">
+          <span class="spacer"></span>
+          <button type="button" class="btn ghost" data-close>Annulla</button>
+          <button type="submit" class="btn primary">Salva</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="saldo-dialog">
+      <form id="saldo-form" method="dialog" class="stack">
+        <h2>Saldo del conto Hello</h2>
+        <div class="grid2">
+          <label>Data<input type="date" name="data" required /></label>
+          <label>Saldo €<input type="number" step="0.01" name="saldo" required /></label>
+        </div>
+        <p class="muted small-text">Il saldo disponibile che vedi nell’app della banca. Da qui in poi l’app aggiunge i movimenti del conto che importi con data successiva.</p>
+        <p id="saldo-message" class="form-message" role="status"></p>
+        <div class="dialog-actions">
+          <span class="spacer"></span>
+          <button type="button" class="btn ghost" data-close>Annulla</button>
+          <button type="submit" class="btn primary">Salva</button>
+        </div>
+      </form>
+    </dialog>
+
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script src="supabase-config.js"></script>
-    <script src="app.js?v=20261103-5"></script>
+    <script src="app.js?v=20261104-1"></script>
     <script src="movimenti.js?v=20261103-7"></script>
     <script src="prossime.js?v=20261103-3"></script>
-    <script src="spese.js?v=20261103-3"></script>
+    <script src="spese.js?v=20261104-1"></script>
+    <script src="budget.js?v=20261104-1"></script>
   </body>
 </html>

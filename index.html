@@ -539,12 +539,15 @@
 
     <dialog id="saldo-dialog">
       <form id="saldo-form" method="dialog" class="stack">
-        <h2>Saldo del conto Hello</h2>
+        <h2>Aggiorna saldo</h2>
+        <label>Conto o carta
+          <select name="conto"><option value="conto_hb">Conto Hello</option><option value="carta_hb">Carta Hello</option><option value="amex">Amex</option></select>
+        </label>
         <div class="grid2">
           <label>Data<input type="date" name="data" required /></label>
-          <label>Saldo €<input type="number" step="0.01" name="saldo" required /></label>
+          <label id="saldo-label">Saldo €<input type="number" step="0.01" name="saldo" required /></label>
         </div>
-        <p class="muted small-text">Il saldo disponibile che vedi nell’app della banca. Da qui in poi l’app aggiunge i movimenti del conto che importi con data successiva.</p>
+        <p class="muted small-text" id="saldo-aiuto"></p>
         <p id="saldo-message" class="form-message" role="status"></p>
         <div class="dialog-actions">
           <span class="spacer"></span>
@@ -561,6 +564,6 @@
     <script src="movimenti.js?v=20261103-7"></script>
     <script src="prossime.js?v=20261103-3"></script>
     <script src="spese.js?v=20261104-1"></script>
-    <script src="budget.js?v=20261104-1"></script>
+    <script src="budget.js?v=20261104-2"></script>
   </body>
 </html>

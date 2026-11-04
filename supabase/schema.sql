@@ -262,9 +262,9 @@ create policy "casa_budget_proprietario" on public.casa_budget
 create table public.casa_saldi (
   id          uuid primary key default gen_random_uuid(),
   user_id     uuid not null default auth.uid() references auth.users(id) on delete cascade,
-  conto       text not null default 'conto_hb' check (conto in ('conto_hb', 'revolut')),
+  conto       text not null default 'conto_hb' check (conto in ('conto_hb', 'revolut', 'carta_hb', 'amex')),
   data        date not null,
-  saldo       numeric(10,2) not null,
+  saldo       numeric(10,2) not null,       -- per le carte: speso dall'ultimo estratto (positivo)
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now(),
   unique (user_id, conto, data)

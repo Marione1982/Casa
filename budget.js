@@ -26,7 +26,7 @@ async function caricaBudget() {
   if (!sb || !currentUser) return;
   const [b, s] = await Promise.all([
     sb.from('casa_budget').select('*').order('valido_dal'),
-    sb.from('casa_saldi').select('*').eq('conto', 'conto_hb').order('data'),
+    sb.from('casa_saldi').select('*').order('data'),
   ]);
   if (b.error) console.warn('Budget non disponibile:', b.error.message);
   if (s.error) console.warn('Saldi non disponibili:', s.error.message);
@@ -36,9 +36,50 @@ async function caricaBudget() {
 }
 
 const budgetDel = k => budgetImp.filter(r => r.valido_dal <= `${k}-01`).at(-1) || null;
-const ultimoSaldo = () => saldi.at(-1) || null;
+const ultimoSaldo = () => saldi.filter(r => r.conto === 'conto_hb').at(-1) || null;
 const listaMov = () => typeof movimenti !== 'undefined' ? movimenti : [];
 const sommaImp = (l, f = x => x.importo) => l.reduce((t, x) => t + (f(x) || 0), 0);
+
+/* ---------- Carte: speso dall'ultimo estratto, inserito a mano ---------- */
+
+// Giorno di chiusura degli estratti: la carta Hello chiude il 21, Amex il 20
+const CHIUSURA = { carta_hb: 21, amex: 20 };
+const NOMI_CARTE = { carta_hb: 'Carta Hello', amex: 'Amex' };
+const codiceDa = (fonte, d) => { const k = ym(d); return (Number(d.slice(8)) > CHIUSURA[fonte] ? ymAdd(k, 1) : k).replace('-', ''); };
+const kDaCodice = c => `${c.slice(0, 4)}-${c.slice(4)}`;
+const fineEstratto = (fonte, c) => `${kDaCodice(c)}-${String(CHIUSURA[fonte]).padStart(2, '0')}`;
+const inizioEstratto = (fonte, c) => piuGiorni(fineEstratto(fonte, ymAdd(kDaCodice(c), -1).replace('-', '')), 1);
+const giaImportato = (fonte, c) => -sommaImp(listaMov().filter(m => m.fonte === fonte && m.estratto === c));
+
+// Ultimo speso inserito per la carta, se è più recente dei movimenti importati (altrimenti valgono i movimenti)
+function spesoCarta(fonte) {
+  const r = saldi.filter(x => x.conto === fonte).at(-1);
+  const ultima = ultimaDataFonte(fonte);
+  if (!r || (ultima && r.data <= ultima)) return null;
+  const codice = codiceDa(fonte, r.data);
+  const fine = fineEstratto(fonte, codice);
+  const mancanti = Math.max(0, giorniTra(r.data, fine));
+  const giorniEstratto = giorniTra(inizioEstratto(fonte, codice), fine) + 1;
+  const stimaResto = mancanti ? stimaEstratto(fonte) / giorniEstratto * mancanti : 0;
+  // parte non ancora importata e giorni a cui si riferisce
+  const daGiorno = [inizioEstratto(fonte, codice), ultima ? piuGiorni(ultima, 1) : null].filter(Boolean).sort().at(-1);
+  return { fonte, data: r.data, speso: r.saldo, codice, fine, mancanti, totale: r.saldo + stimaResto,
+    nonImportato: Math.max(0, r.saldo - giaImportato(fonte, codice)), daGiorno };
+}
+
+// Quota delle spese con carta non ancora importate che cade nel mese k (divisa in proporzione ai giorni)
+function carteNonImportate(k) {
+  const out = [];
+  for (const fonte of Object.keys(CHIUSURA)) {
+    const c = spesoCarta(fonte);
+    if (!c || !c.nonImportato || c.daGiorno > c.data) continue;
+    const tot = giorniTra(c.daGiorno, c.data) + 1;
+    const da = c.daGiorno > `${k}-01` ? c.daGiorno : `${k}-01`, a = c.data < `${k}-${ultimoGiorno(k)}` ? c.data : `${k}-${ultimoGiorno(k)}`;
+    const nel = da <= a ? giorniTra(da, a) + 1 : 0;
+    if (nel) out.push({ id: `stima-${fonte}`, fonte, data: a, tipo: 'normale', categoria: 'Carta (inserito a mano)', importo: -Math.round(c.nonImportato * nel / tot * 100) / 100 });
+  }
+  return out;
+}
 
 /* ---------- Calendario: festivi e giorni di stipendio ---------- */
 
@@ -83,12 +124,13 @@ function idFissiDelMese(k) {
 function variabiliDelMese(k, fissi = idFissiDelMese(k)) {
   const l = listaMov().filter(m => m.tipo === 'normale' && ym(m.data) === k && !fissi.has(m.id) && !CATEGORIE_FISSE.includes(m.categoria)
     && (m.importo < 0 || m.categoria === 'Rimborsi'));
+  l.push(...carteNonImportate(k));
   return { totale: -sommaImp(l), lista: l };
 }
 
 // Risparmio del mese k: tutte le entrate meno tutte le uscite (giroconti e addebiti delle carte esclusi)
 function risparmioDelMese(k) {
-  const l = listaMov().filter(m => m.tipo === 'normale' && ym(m.data) === k);
+  const l = [...listaMov().filter(m => m.tipo === 'normale' && ym(m.data) === k), ...carteNonImportate(k)];
   return { entrate: sommaImp(l.filter(m => m.importo > 0)), uscite: -sommaImp(l.filter(m => m.importo < 0)), netto: sommaImp(l) };
 }
 
@@ -161,9 +203,19 @@ function usciteFra(dal, al) {
     for (const v of vociCarte().filter(s => attivaNelMese(s, k) && CONTI_SALDO.includes(s.pagamento))) {
       const c = cartaDelMese(v, k), d = dataPrevista(c, k);
       if (!d || d <= dal || d > al || c.importo === 0 || abbinaMese(k, [c]).has(c.id)) continue;
-      const stimato = c.importo == null;
-      if (stimato && !stimaEstratto(v.estratto_carta)) continue;
-      out.push({ data: d, nome: v.nome, sotto: `estratto di ${nomeEstratto(v, k)}${stimato ? ' non ancora caricato: stima' : ''}`, importo: stimato ? stimaEstratto(v.estratto_carta) : c.importo, stimato, colore: TIPI_SF.carta.colore });
+      let stimato = c.importo == null, importo = c.importo, sotto = `estratto di ${nomeEstratto(v, k)}`;
+      if (stimato) {
+        const sp = spesoCarta(v.estratto_carta);
+        if (sp && sp.codice === codiceEstratto(v, k)) {
+          importo = sp.totale; stimato = sp.mancanti > 0;
+          sotto += sp.mancanti ? `: speso ${eur0.format(sp.speso)} al ${fmtGiorno(sp.data)} + stima fino al ${fmtGiorno(sp.fine)}` : `: speso ${eur0.format(sp.speso)}, estratto chiuso`;
+        } else {
+          importo = stimaEstratto(v.estratto_carta);
+          sotto += ' non ancora caricato: stima';
+        }
+        if (!importo) continue;
+      }
+      out.push({ data: d, nome: v.nome, sotto, importo, stimato, colore: TIPI_SF.carta.colore });
     }
   }
   // bollette: già arrivate e da arrivare
@@ -318,9 +370,11 @@ function renderBudgetMese(k, stats) {
       restaV >= 0 ? `Ti restano ${eur0.format(restaV)} per ${ggRestano} giorni, circa ${eur0.format(restaV / ggRestano)} al giorno.` : `Hai superato il tetto di ${eur0.format(-restaV)}.`)}
     ${b.obiettivo_risparmio > 0 ? barra('Risparmio del mese', `${eur0.format(r.netto)} di ${eur0.format(b.obiettivo_risparmio)}`, pctR, null, pctR >= 1 ? 'verde' : 'neutro',
       `Entrate ${eur0.format(r.entrate)} meno uscite ${eur0.format(r.uscite)} finora. Si legge bene a fine mese, dopo gli stipendi.`) : ''}`;
-  const carte = ['carta_hb', 'amex'].map(f => [f, ultimaDataFonte(f)]).filter(([, d]) => d && d < oggi);
+  const inserite = Object.keys(CHIUSURA).map(spesoCarta).filter(Boolean);
+  const carte = ['carta_hb', 'amex'].filter(f => !inserite.some(c => c.fonte === f)).map(f => [f, ultimaDataFonte(f)]).filter(([, d]) => d && d < oggi);
   $('#bg-mese-foot').textContent = `Spese variabili = tutte le uscite tranne spese fisse, bollette, condominio, rate e abbonamenti; i rimborsi le riducono. `
     + `La tacca sulla barra indica dove dovresti essere oggi. `
+    + (inserite.length ? `Speso con le carte inserito a mano: ${inserite.map(c => `${NOMI_CARTE[c.fonte]} ${eur0.format(c.speso)} al ${fmtGiorno(c.data)}`).join(', ')} (la parte non ancora importata è divisa per giorni). ` : '')
     + (carte.length ? `Le carte entrano con gli estratti: ${carte.map(([f, d]) => `${PAGAMENTI_SF[f]} fino al ${fmtGiorno(d)}`).join(', ')}.` : '');
 }
 
@@ -400,18 +454,28 @@ bgForm.addEventListener('submit', async e => {
 });
 
 const saldoDlg = $('#saldo-dialog'), saldoForm = $('#saldo-form');
+function aggiornaSaldoForm() {
+  const carta = saldoForm.elements.conto.value !== 'conto_hb';
+  $('#saldo-label').firstChild.textContent = carta ? 'Speso dall’ultimo estratto €' : 'Saldo €';
+  saldoForm.elements.saldo.min = carta ? '0' : '';
+  $('#saldo-aiuto').textContent = carta
+    ? `Quanto hai speso con la carta dall’ultimo estratto (chiude il ${CHIUSURA[saldoForm.elements.conto.value]} di ogni mese), come lo vedi nell’app della banca. Serve finché non importi il PDF dell’estratto.`
+    : 'Il saldo disponibile che vedi nell’app della banca. Da qui in poi l’app aggiunge i movimenti del conto che importi con data successiva.';
+}
 function apriSaldo() {
   saldoForm.reset();
   saldoForm.elements.data.value = oggiRoma();
+  aggiornaSaldoForm();
   $('#saldo-message').textContent = '';
   saldoDlg.showModal();
   saldoForm.elements.saldo.focus();
 }
 $('#bg-saldo-btn').addEventListener('click', apriSaldo);
+saldoForm.elements.conto.addEventListener('change', aggiornaSaldoForm);
 saldoDlg.querySelector('[data-close]').addEventListener('click', () => saldoDlg.close());
 saldoForm.addEventListener('submit', async e => {
   e.preventDefault();
-  const r = { conto: 'conto_hb', data: saldoForm.elements.data.value, saldo: Number(saldoForm.elements.saldo.value) };
+  const r = { conto: saldoForm.elements.conto.value, data: saldoForm.elements.data.value, saldo: Number(saldoForm.elements.saldo.value) };
   $('#saldo-message').textContent = 'Salvataggio…';
   const { error } = await sb.from('casa_saldi').upsert(r, { onConflict: 'user_id,conto,data' });
   if (error) { $('#saldo-message').textContent = 'Errore: ' + error.message; return; }

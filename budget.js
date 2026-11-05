@@ -8,6 +8,7 @@
 let budgetImp = [];        // casa_budget: tetto e obiettivo, ognuno valido da un mese
 let saldi = [];            // casa_saldi: saldi del conto inseriti a mano
 let bgVista = 'variabili';
+let bgMeseCat = null;      // mese mostrato nella sintesi per categoria (null = mese in corso)
 
 // Categorie che non sono spese variabili (spese fisse, bollette, rate)
 const CATEGORIE_FISSE = ['Finanziamenti', 'Condominio', 'Utenze', 'Abbonamenti'];
@@ -275,6 +276,7 @@ function renderBudget() {
   renderBudgetMese(k, stats);
   renderPrevisione(ymAdd(k, 1), stats);
   renderBudgetStorico(stats);
+  renderCategorieBudget(stats);
   $('#bg-imposta-btn').textContent = budgetDel(k) ? 'Modifica budget' : 'Imposta budget';
 }
 
@@ -347,32 +349,43 @@ function renderStipendio(stats) {
     + `Movimenti importati fino al: ${agg.map(([f, d]) => `${PAGAMENTI_SF[f]} ${fmtGiorno(d)}`).join(', ')}.`;
 }
 
+// I quattro riquadri del mese, uguali per il mese in corso e la previsione
+function kpiMese(k, stats, inCorso) {
+  const b = budgetDel(k);
+  const entrate = sommaImp(STIPENDI, st => importoStipendio(st, k));
+  const boll = bolletteTotMese(k);
+  const fisse = fisseDelMese(k) + boll.tot;
+  const r = inCorso ? risparmioDelMese(k) : null, v = inCorso ? variabiliDelMese(k) : null;
+  const dic = k.endsWith('-12');
+  const subEntrate = inCorso ? `finora ${eur0.format(r.entrate)}` : dic ? `con la tredicesima, verso il ${fmtGiorno(dataStipendio(STIPENDI[0], k))}` : `il ${STIPENDI.map(st => fmtGiorno(dataStipendio(st, k))).join(' e il ')}`;
+  const subFisse = `di cui bollette ~${eur0.format(boll.tot)}${inCorso && boll.pagate ? ` (${eur0.format(boll.pagate)} già pagate)` : ''}`;
+  const variabili = b ? b.tetto_variabili : stats.mediana;
+  const previsto = entrate - fisse - variabili;
+  const html = `
+    <div class="kpi"><div class="label">Entrate previste</div><div class="value">${eur0.format(entrate)}</div><div class="sub">${subEntrate}</div></div>
+    <div class="kpi"><div class="label">Spese fisse e bollette</div><div class="value">${eur0.format(fisse)}</div><div class="sub">${subFisse}</div></div>
+    ${b ? `<div class="kpi"><div class="label">Tetto spese variabili</div><div class="value">${eur0.format(b.tetto_variabili)}</div><div class="sub">${inCorso ? `finora ${eur0.format(v.totale)}` : 'da spendere nel mese'}</div></div>
+    <div class="kpi ${previsto < b.obiettivo_risparmio ? 'bg-rosso' : 'bg-verde'}"><div class="label">Risparmio previsto</div><div class="value">${eur0.format(previsto)}</div><div class="sub">obiettivo ${eur0.format(b.obiettivo_risparmio)}</div></div>`
+    : `<div class="kpi"><div class="label">Spese variabili tipiche</div><div class="value">${eur0.format(stats.mediana)}</div><div class="sub">mediana degli ultimi 12 mesi</div></div>
+    <div class="kpi"><div class="label">Resterebbe</div><div class="value">${eur0.format(previsto)}</div><div class="sub">nel mese</div></div>`}`;
+  return { html, b, r, v, entrate, fisse, previsto };
+}
+
 function renderBudgetMese(k, stats) {
   const oggi = oggiRoma(), b = budgetDel(k);
   const nome = ymNome(k);
   $('#bg-mese-titolo').textContent = nome.replace(/^./, c => c.toUpperCase());
-  const entrate = sommaImp(STIPENDI, st => importoStipendio(st, k));
-  const fisse = fisseDelMese(k) + bolletteMediaMese();
-  const v = variabiliDelMese(k), r = risparmioDelMese(k), straord = straordinarieDelMese(k);
+  const km = kpiMese(k, stats, true);
+  const v = km.v, r = km.r, straord = straordinarieDelMese(k);
   const giorniMese = ultimoGiorno(k), oggiG = Number(oggi.slice(8));
+  $('#bg-mese-kpis').innerHTML = km.html;
   if (!b) {
     $('#bg-period').textContent = 'Budget non ancora impostato';
-    $('#bg-mese-kpis').innerHTML = `
-      <div class="kpi"><div class="label">Entrate previste</div><div class="value">${eur0.format(entrate)}</div><div class="sub">i due stipendi</div></div>
-      <div class="kpi"><div class="label">Spese fisse e bollette</div><div class="value">${eur0.format(fisse)}</div><div class="sub">al mese</div></div>
-      <div class="kpi"><div class="label">Spese variabili tipiche</div><div class="value">${eur0.format(stats.mediana)}</div><div class="sub">mediana degli ultimi 12 mesi</div></div>
-      <div class="kpi"><div class="label">Resterebbe</div><div class="value">${eur0.format(entrate - fisse - stats.mediana)}</div><div class="sub">al mese</div></div>`;
     $('#bg-barre').innerHTML = `<p class="muted">Imposta il tetto delle spese variabili e l’obiettivo di risparmio: ti propongo già i valori di partenza. <button type="button" class="link-btn" data-imposta>Imposta budget</button></p>`;
     $('#bg-mese-foot').textContent = '';
     return;
   }
-  const previsto = entrate - fisse - b.tetto_variabili;
   $('#bg-period').textContent = `Tetto ${eur0.format(b.tetto_variabili)} al mese · obiettivo di risparmio ${eur0.format(b.obiettivo_risparmio)}`;
-  $('#bg-mese-kpis').innerHTML = `
-    <div class="kpi"><div class="label">Entrate previste</div><div class="value">${eur0.format(entrate)}</div><div class="sub">finora ${eur0.format(r.entrate)}</div></div>
-    <div class="kpi"><div class="label">Spese fisse e bollette</div><div class="value">${eur0.format(fisse)}</div><div class="sub">bollette come media dell’ultimo anno</div></div>
-    <div class="kpi"><div class="label">Tetto spese variabili</div><div class="value">${eur0.format(b.tetto_variabili)}</div><div class="sub">finora ${eur0.format(v.totale)}</div></div>
-    <div class="kpi ${previsto < b.obiettivo_risparmio ? 'bg-rosso' : 'bg-verde'}"><div class="label">Risparmio previsto</div><div class="value">${eur0.format(previsto)}</div><div class="sub">obiettivo ${eur0.format(b.obiettivo_risparmio)}</div></div>`;
 
   const pctV = b.tetto_variabili ? v.totale / b.tetto_variabili : 0;
   const pctOggi = oggiG / giorniMese;
@@ -388,7 +401,7 @@ function renderBudgetMese(k, stats) {
   const inserite = Object.keys(CHIUSURA).map(spesoCarta).filter(Boolean);
   const carte = ['carta_hb', 'amex'].filter(f => !inserite.some(c => c.fonte === f)).map(f => [f, ultimaDataFonte(f)]).filter(([, d]) => d && d < oggi);
   $('#bg-mese-foot').textContent = `Spese variabili = tutte le uscite tranne spese fisse, bollette, condominio, rate, abbonamenti e straordinarie; i rimborsi le riducono. `
-    + `La tacca sulla barra indica dove dovresti essere oggi. `
+    + `Bollette = già addebitate nel mese più quelle ancora da pagare (arrivate o stimate). La tacca sulla barra indica dove dovresti essere oggi. `
     + (inserite.length ? `Speso con le carte inserito a mano: ${inserite.map(c => `${NOMI_CARTE[c.fonte]} ${eur0.format(c.speso)} al ${fmtGiorno(c.data)}`).join(', ')} (la parte non ancora importata è divisa per giorni). ` : '')
     + (carte.length ? `Le carte entrano con gli estratti: ${carte.map(([f, d]) => `${PAGAMENTI_SF[f]} fino al ${fmtGiorno(d)}`).join(', ')}.` : '');
 }
@@ -401,30 +414,30 @@ function bolletteDelMese(k) {
   ];
   return l.filter(b => ym(b.data) === k && b.importo > 0).sort((a, b) => a.data.localeCompare(b.data));
 }
+// Bollette già addebitate nel mese k (movimenti con EDISON, AMGAS, ACQUEDOTTO…)
+function bollettePagateNelMese(k) {
+  return listaMov().filter(m => m.tipo === 'normale' && m.importo < 0 && ym(m.data) === k
+    && Object.values(CHIAVI_PAGAMENTO).flat().some(c => norm(m.descrizione).includes(c)));
+}
+// Bollette del mese k: già pagate + ancora da pagare (arrivate o stimate)
+function bolletteTotMese(k) {
+  const pagate = -sommaImp(bollettePagateNelMese(k)), da = sommaImp(bolletteDelMese(k));
+  return { pagate, da, tot: pagate + da };
+}
 const nomeBolletta = b => b.tipo === 'acqua' ? `${b.codice.slice(4)}° trimestre ${b.codice.slice(0, 4)}` : nomeBimestre(b.codice);
 
 function renderPrevisione(k, stats) {
-  const b = budgetDel(k);
   $('#bg-prev-titolo').textContent = `Previsione ${ymNome(k)}`;
-  const entrate = sommaImp(STIPENDI, st => importoStipendio(st, k));
-  const fisse = fisseDelMese(k);
-  const boll = bolletteDelMese(k), totBoll = sommaImp(boll);
-  const variabili = b ? b.tetto_variabili : stats.mediana;
-  const previsto = entrate - fisse - totBoll - variabili;
   const dic = k.endsWith('-12');
-  const date = STIPENDI.map(st => fmtGiorno(dataStipendio(st, k)));
-  $('#bg-prev-kpis').innerHTML = `
-    <div class="kpi"><div class="label">Entrate previste</div><div class="value">${eur0.format(entrate)}</div><div class="sub">${dic ? `con la tredicesima, verso il ${date[0]}` : `il ${date.join(' e il ')}`}</div></div>
-    <div class="kpi"><div class="label">Spese fisse</div><div class="value">${eur0.format(fisse)}</div><div class="sub">del mese, comprese le annuali</div></div>
-    <div class="kpi"><div class="label">Bollette previste</div><div class="value">${totBoll ? '~' + eur0.format(totBoll) : '–'}</div><div class="sub">${boll.length ? `${boll.length} in pagamento nel mese` : 'nessuna prevista per ora'}</div></div>
-    <div class="kpi ${b && previsto < b.obiettivo_risparmio ? 'bg-rosso' : 'bg-verde'}"><div class="label">Risparmio previsto</div><div class="value">${eur0.format(previsto)}</div><div class="sub">${b ? `con il tetto di ${eur0.format(variabili)} · obiettivo ${eur0.format(b.obiettivo_risparmio)}` : `con spese variabili tipiche di ${eur0.format(variabili)}`}</div></div>`;
+  const boll = bolletteDelMese(k);
+  $('#bg-prev-kpis').innerHTML = kpiMese(k, stats, false).html;
   $('#bg-prev-bollette').innerHTML = boll.map(x => rigaUscita({ data: x.data, nome: `Bolletta ${NOMI[x.tipo].toLowerCase()} · ${x.nomeP}`, sotto: `${x.arrivata ? 'arrivata' : 'stima'}${x.automatico ? ', addebito diretto' : ', da pagare a mano'}`, importo: x.importo, stimato: !x.arrivata, colore: `--${x.tipo}` })).join('');
   const nuoveFisse = tutteLeVoci().filter(s => attivaNelMese(s, k) && !attivaNelMese(s, ymAdd(k, -1)));
   const finite = tutteLeVoci().filter(s => !attivaNelMese(s, k) && attivaNelMese(s, ymAdd(k, -1)) && s.frequenza === 'mensile');
   $('#bg-prev-foot').textContent = (dic ? 'A dicembre gli stipendi arrivano verso il 15: per il Ministero vale l’accredito di dicembre dell’anno scorso, per MetLife il netto tipico più l’ultima tredicesima. ' : '')
     + (nuoveFisse.length ? `Spese che ci sono solo in questo mese o iniziano ora: ${nuoveFisse.map(s => `${s.nome} ${eur0.format(s.importo)}`).join(', ')}. ` : '')
     + (finite.length ? `Finite il mese prima: ${finite.map(s => s.nome).join(', ')}. ` : '')
-    + 'Le spese straordinarie non sono previste.';
+    + 'Spese fisse del mese comprese le annuali; bollette = quelle in pagamento nel mese, elencate sopra. Le spese straordinarie non sono previste.';
 }
 
 function barra(titolo, valore, pct, tacca, stato, nota) {
@@ -465,9 +478,64 @@ function renderBudgetStorico(stats) {
     foot = `Risparmio = entrate meno uscite del mese (i passaggi tra i tuoi conti non contano). Media degli ultimi 12 mesi: ${eur0.format(validi.reduce((a, b) => a + b, 0) / Math.max(1, validi.length))}. Il mese in corso è parziale.`;
   }
   opts.plugins.tooltip.callbacks = { label: c => c.parsed.y == null ? null : ` ${c.dataset.label}: ${eur0.format(c.parsed.y)}` };
+  opts.onClick = (_e, els) => {
+    if (!els.length) return;
+    const kk = righe[els[0].index].k;
+    bgMeseCat = kk === k0 ? null : kk;
+    renderCategorieBudget(statsVariabili());
+    $('#bg-categorie').closest('.card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+  foot += ' Tocca un mese per vederne le categorie.';
   disegna('chart-bg', { type: 'bar', data: { labels, datasets }, options: opts });
   $('#bg-storico-foot').textContent = foot;
 }
+
+/* ---------- Sintesi per categoria ---------- */
+
+const nomeCatBudget = c => c === 'Carta (inserito a mano)' ? 'Carte, da importare' : c;
+
+function renderCategorieBudget(stats) {
+  const k0 = ym(oggiRoma()), k = bgMeseCat || k0;
+  const v = variabiliDelMese(k), straord = straordinarieDelMese(k);
+  const perCat = {};
+  for (const m of v.lista) { const c = m.categoria || 'Altro'; perCat[c] = (perCat[c] || 0) - m.importo; }
+  // il solito di ogni categoria: mediana degli ultimi 12 mesi completi (zero nei mesi senza spese)
+  const mesi = stats.righe.filter(r => r.lista.length);
+  const solito = c => mesi.length ? Math.max(0, Math.round(mediana(mesi.map(r => -sommaImp(r.lista.filter(m => (m.categoria || 'Altro') === c)))))) : 0;
+  const cats = Object.entries(perCat).filter(([, x]) => Math.abs(x) >= 0.5).sort((a, b) => b[1] - a[1]);
+  const max = Math.max(1, ...cats.map(([, x]) => x));
+  const tot = v.totale;
+  $('#bg-cat-titolo').textContent = `Spese variabili di ${ymNome(k)}`;
+  $('#bg-cat-tot').textContent = `${eur0.format(tot)} in tutto`;
+  $('#bg-cat-oggi').hidden = !bgMeseCat;
+  $('#bg-categorie').innerHTML = (cats.length ? cats.map(([c, x]) => {
+    const s = c === 'Carta (inserito a mano)' ? null : solito(c);
+    return `<button type="button" class="cat-riga" ${c === 'Carta (inserito a mano)' ? 'disabled' : `data-bgcat="${esc(c)}"`}>
+      <span>${esc(nomeCatBudget(c))}</span>
+      <span class="barra"><i style="width:${Math.max(0, x / max * 100).toFixed(1)}%"></i></span>
+      <span class="num">${eur0.format(x)}<small>${tot > 0 ? num0.format(x / tot * 100) + '%' : ''}${s != null ? ` · di solito ${eur0.format(s)}` : ''}</small></span>
+    </button>`;
+  }).join('') : '<p class="muted">Nessuna spesa variabile nel mese.</p>')
+    + (straord > 0 ? `<button type="button" class="cat-riga bg-cat-straord" data-bgcat="${STRAORDINARIE}">
+      <span>Straordinarie</span><span class="muted small-text">fuori dal tetto</span><span class="num">${eur0.format(straord)}</span></button>` : '');
+  $('#bg-cat-foot').textContent = `"Di solito" = mediana della categoria negli ultimi 12 mesi. Tocca una categoria per vederne i movimenti; tocca un mese nel grafico qui sopra per cambiare mese.`
+    + (k === k0 ? ' Il mese in corso è parziale.' : '');
+}
+
+// Apre la sezione Movimenti filtrata su mese e categoria
+function apriMovimentiCategoria(k, c) {
+  movState.fonte = 'tutte'; movState.anno = k.slice(0, 4); movState.mese = k; movState.verso = 'u';
+  movState.categoria = c; movState.cerca = ''; movState.mostra = 100;
+  const cerca = $('#mov-cerca'); if (cerca) cerca.value = '';
+  $('.section-tab[data-section="movimenti"]').click();
+  renderMovimenti();
+  $('#mov-elenco').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+$('#bg-categorie').addEventListener('click', e => {
+  const c = e.target.closest('[data-bgcat]')?.dataset.bgcat;
+  if (c) apriMovimentiCategoria(bgMeseCat || ym(oggiRoma()), c);
+});
+$('#bg-cat-oggi').addEventListener('click', () => { bgMeseCat = null; renderCategorieBudget(statsVariabili()); });
 
 /* ---------- Eventi e finestre ---------- */
 

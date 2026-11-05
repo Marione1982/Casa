@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="styles.css?v=20261105-1stipendio" />
+    <link rel="stylesheet" href="styles.css?v=20261105-2stipendio" />
   </head>
   <body>
     <!-- Accesso -->
@@ -335,6 +335,15 @@
             <div class="chart-box"><canvas id="chart-bg" aria-label="Spese variabili e risparmio mese per mese"></canvas></div>
             <p class="foot muted" id="bg-storico-foot"></p>
           </article>
+
+          <article class="card">
+            <header class="card-head">
+              <h2 id="bg-cat-titolo">Spese variabili per categoria</h2>
+              <div class="bg-cat-head-dx"><span class="muted small-text" id="bg-cat-tot"></span><button type="button" class="btn ghost small" id="bg-cat-oggi" hidden>Questo mese</button></div>
+            </header>
+            <div id="bg-categorie" class="cat-lista"></div>
+            <p class="foot muted" id="bg-cat-foot"></p>
+          </article>
         </section>
 
         <!-- Sezione Stipendio -->
@@ -620,7 +629,7 @@
     <script src="movimenti.js?v=20261105-1"></script>
     <script src="prossime.js?v=20261103-3"></script>
     <script src="spese.js?v=20261104-1"></script>
-    <script src="budget.js?v=20261105-1"></script>
+    <script src="budget.js?v=20261105-2"></script>
     <script src="stipendio.js?v=20261104-1"></script>
   </body>
 </html>

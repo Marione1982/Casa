@@ -3,7 +3,7 @@
 'use strict';
 
 const FONTI = { conto_hb: 'Conto Hello', carta_hb: 'Carta Hello', amex: 'Amex', revolut: 'Revolut' };
-const CATEGORIE_USCITA = ['Spesa', 'Ristoranti e bar', 'Casa', 'Utenze', 'Condominio', 'Finanziamenti', 'Trasporti', 'Salute',
+const CATEGORIE_USCITA = ['Animali', 'Assicurazioni', 'Spesa', 'Ristoranti e bar', 'Casa', 'Utenze', 'Condominio', 'Finanziamenti', 'Trasporti', 'Salute',
   'Abbonamenti', 'Shopping', 'Sport e svago', 'Viaggi', 'Istruzione', 'Bonifici', 'Contanti', 'Banca e tasse', 'Straordinarie', 'Altro'];
 const CATEGORIE_ENTRATA = ['Stipendi', 'Rimborsi', 'Altre entrate'];
 const alfabetico = (a, b) => a.localeCompare(b, 'it', { sensitivity: 'base' });
@@ -31,7 +31,8 @@ const REGOLE_BASE = [
   ['TELECOM', 'Utenze'], ['TIM ', 'Utenze'], ['ILIAD', 'Utenze'], ['VODAFONE', 'Utenze'], ['WINDTRE', 'Utenze'], ['FASTWEB', 'Utenze'],
   ['CONDOMINIO', 'Condominio'], ['QUOTA ORDINARIA', 'Condominio'], ['QUOTE ORDINARIE', 'Condominio'],
   ['PAG PUB', 'Banca e tasse'], ['GOMME', 'Trasporti'], ['POLIAMBULATOR', 'Salute'], ['MOBILI', 'Casa'], ['AGRIEURO', 'Casa'],
-  ['ARCAPLANET', 'Casa'], ['GIOIELL', 'Shopping'],
+  ['ARCAPLANET', 'Animali'], ['VETERINAR', 'Animali'], ['TOELETT', 'Animali'], ['ZOOPLUS', 'Animali'], ['GIOIELL', 'Shopping'],
+  ['ZURICH', 'Assicurazioni'], ['ASSICURAZ', 'Assicurazioni'], ['UNIPOL', 'Assicurazioni'], ['ALLIANZ', 'Assicurazioni'], ['DILL\'S', 'Trasporti'],
   ['LEROY MERLIN', 'Casa'], ['BRICO', 'Casa'], ['IKEA', 'Casa'], ['CASA MANIA', 'Casa'], ['HAPPY CASA', 'Casa'], ['TECNOMAT', 'Casa'],
   ['VORWERK', 'Casa'], ['FERRAMENTA', 'Casa'], ['EDILSERVICE', 'Casa'], ['BOTANICALS', 'Casa'],
   // finanziamenti

@@ -31,7 +31,7 @@ const REGOLE_BASE = [
   ['TELECOM', 'Utenze'], ['TIM ', 'Utenze'], ['ILIAD', 'Utenze'], ['VODAFONE', 'Utenze'], ['WINDTRE', 'Utenze'], ['FASTWEB', 'Utenze'],
   ['CONDOMINIO', 'Condominio'], ['QUOTA ORDINARIA', 'Condominio'], ['QUOTE ORDINARIE', 'Condominio'],
   ['PAG PUB', 'Banca e tasse'], ['GOMME', 'Trasporti'], ['POLIAMBULATOR', 'Salute'], ['MOBILI', 'Casa'], ['AGRIEURO', 'Casa'],
-  ['ARCAPLANET', 'Animali'], ['VETERINAR', 'Animali'], ['TOELETT', 'Animali'], ['ZOOPLUS', 'Animali'], ['GIOIELL', 'Shopping'],
+  ['DISTRIBUZIONE G.M.', 'Casa'], ['ACTION', 'Casa'], ['ARCAPLANET', 'Animali'], ['VETERINAR', 'Animali'], ['TOELETT', 'Animali'], ['ZOOPLUS', 'Animali'], ['GIOIELL', 'Shopping'],
   ['ZURICH', 'Assicurazioni'], ['ASSICURAZ', 'Assicurazioni'], ['UNIPOL', 'Assicurazioni'], ['ALLIANZ', 'Assicurazioni'], ['DILL\'S', 'Trasporti'],
   ['LEROY MERLIN', 'Casa'], ['BRICO', 'Casa'], ['IKEA', 'Casa'], ['CASA MANIA', 'Casa'], ['HAPPY CASA', 'Casa'], ['TECNOMAT', 'Casa'],
   ['VORWERK', 'Casa'], ['FERRAMENTA', 'Casa'], ['EDILSERVICE', 'Casa'], ['BOTANICALS', 'Casa'],
@@ -42,7 +42,7 @@ const REGOLE_BASE = [
   ['KLARNA', 'Finanziamenti'], ['EROGAZIONE FINANZIAMENTO', 'Altre entrate'],
   // spesa
   ['FAMILA', 'Spesa'], ['MEGAGEST', 'Spesa'], ['COOP', 'Spesa'], ['LIDL', 'Spesa'], ['CONAD', 'Spesa'], ['CARREFOUR', 'Spesa'], ['CRF EXP', 'Spesa'],
-  ['ESSELUNGA', 'Spesa'], ['EUROSPIN', 'Spesa'], ['IPER', 'Spesa'], ['SUPERMERCATO', 'Spesa'], ['DISTRIBUZIONE G.M.', 'Spesa'], ['MACELLERIA', 'Spesa'],
+  ['ESSELUNGA', 'Spesa'], ['EUROSPIN', 'Spesa'], ['IPER', 'Spesa'], ['SUPERMERCATO', 'Spesa'], ['MACELLERIA', 'Spesa'],
   ['PANIFICIO', 'Spesa'], ['FRUTTERIA', 'Spesa'], ['FRUTTI', 'Spesa'], ['FONTE DEL PANE', 'Spesa'], ['TIGOTA', 'Spesa'], ['ALIMENTARI', 'Spesa'],
   ['ENOTECA', 'Spesa'], ['LE DELIZIE DI', 'Spesa'], ['D MODUGNO', 'Spesa'], ['SIGNORILE', 'Spesa'],
   // ristoranti e bar

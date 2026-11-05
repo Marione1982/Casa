@@ -4,7 +4,7 @@
 
 const FONTI = { conto_hb: 'Conto Hello', carta_hb: 'Carta Hello', amex: 'Amex', revolut: 'Revolut' };
 const CATEGORIE_USCITA = ['Spesa', 'Ristoranti e bar', 'Casa', 'Utenze', 'Condominio', 'Finanziamenti', 'Trasporti', 'Salute',
-  'Abbonamenti', 'Shopping', 'Sport e svago', 'Viaggi', 'Istruzione', 'Bonifici', 'Contanti', 'Banca e tasse', 'Altro'];
+  'Abbonamenti', 'Shopping', 'Sport e svago', 'Viaggi', 'Istruzione', 'Bonifici', 'Contanti', 'Banca e tasse', 'Straordinarie', 'Altro'];
 const CATEGORIE_ENTRATA = ['Stipendi', 'Rimborsi', 'Altre entrate'];
 const alfabetico = (a, b) => a.localeCompare(b, 'it', { sensitivity: 'base' });
 const TIPI_MOV = { normale: '', pagamento_carta: 'pagamento carta', giroconto: 'giroconto' };

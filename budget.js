@@ -11,6 +11,8 @@ let bgVista = 'variabili';
 
 // Categorie che non sono spese variabili (spese fisse, bollette, rate)
 const CATEGORIE_FISSE = ['Finanziamenti', 'Condominio', 'Utenze', 'Abbonamenti'];
+// Spese una tantum (lavori, affitto temporaneo…): fuori dal tetto e dalla mediana, ma contano nel risparmio
+const STRAORDINARIE = 'Straordinarie';
 // Stipendi accreditati sul conto Hello. Se il giorno è sabato, domenica o festivo arrivano il giorno lavorativo prima;
 // a dicembre arrivano entrambi verso il 15 (con la tredicesima).
 const STIPENDI = [
@@ -106,6 +108,11 @@ const movStipendio = st => listaMov().filter(m => m.fonte === 'conto_hb' && m.im
 // (escluso dicembre), prendendo per ogni mese l'accredito più alto.
 function importoStipendio(st, k = null) {
   if (st.id === 'metlife' && typeof nettoMetlife === 'function') { const v = nettoMetlife(k); if (v) return v; }
+  // dicembre (con la tredicesima): gli accrediti del dicembre precedente
+  if (k && k.endsWith('-12')) {
+    const prec = movStipendio(st).filter(m => ym(m.data) === ymAdd(k, -12));
+    if (prec.length) return sommaImp(prec);
+  }
   const perMese = {};
   for (const m of movStipendio(st)) { const k = ym(m.data); if (!k.endsWith('-12')) perMese[k] = Math.max(perMese[k] || 0, m.importo); }
   const ultimi = Object.keys(perMese).sort().slice(-6).map(k => perMese[k]);
@@ -126,10 +133,13 @@ function idFissiDelMese(k) {
 // Spese variabili del mese k: uscite normali tranne fisse, bollette e rate, meno i rimborsi
 function variabiliDelMese(k, fissi = idFissiDelMese(k)) {
   const l = listaMov().filter(m => m.tipo === 'normale' && ym(m.data) === k && !fissi.has(m.id) && !CATEGORIE_FISSE.includes(m.categoria)
-    && (m.importo < 0 || m.categoria === 'Rimborsi'));
+    && m.categoria !== STRAORDINARIE && (m.importo < 0 || m.categoria === 'Rimborsi'));
   l.push(...carteNonImportate(k));
   return { totale: -sommaImp(l), lista: l };
 }
+
+// Spese straordinarie del mese k (fuori tetto)
+const straordinarieDelMese = k => -sommaImp(listaMov().filter(m => m.tipo === 'normale' && ym(m.data) === k && m.categoria === STRAORDINARIE));
 
 // Risparmio del mese k: tutte le entrate meno tutte le uscite (giroconti e addebiti delle carte esclusi)
 function risparmioDelMese(k) {
@@ -263,6 +273,7 @@ function renderBudget() {
   const stats = statsVariabili();
   renderStipendio(stats);
   renderBudgetMese(k, stats);
+  renderPrevisione(ymAdd(k, 1), stats);
   renderBudgetStorico(stats);
   $('#bg-imposta-btn').textContent = budgetDel(k) ? 'Modifica budget' : 'Imposta budget';
 }
@@ -340,9 +351,9 @@ function renderBudgetMese(k, stats) {
   const oggi = oggiRoma(), b = budgetDel(k);
   const nome = ymNome(k);
   $('#bg-mese-titolo').textContent = nome.replace(/^./, c => c.toUpperCase());
-  const entrate = sommaImp(STIPENDI, st => importoStipendio(st));
+  const entrate = sommaImp(STIPENDI, st => importoStipendio(st, k));
   const fisse = fisseDelMese(k) + bolletteMediaMese();
-  const v = variabiliDelMese(k), r = risparmioDelMese(k);
+  const v = variabiliDelMese(k), r = risparmioDelMese(k), straord = straordinarieDelMese(k);
   const giorniMese = ultimoGiorno(k), oggiG = Number(oggi.slice(8));
   if (!b) {
     $('#bg-period').textContent = 'Budget non ancora impostato';
@@ -372,13 +383,48 @@ function renderBudgetMese(k, stats) {
     ${barra('Spese variabili', `${eur0.format(v.totale)} di ${eur0.format(b.tetto_variabili)}`, pctV, pctOggi, statoV,
       restaV >= 0 ? `Ti restano ${eur0.format(restaV)} per ${ggRestano} giorni, circa ${eur0.format(restaV / ggRestano)} al giorno.` : `Hai superato il tetto di ${eur0.format(-restaV)}.`)}
     ${b.obiettivo_risparmio > 0 ? barra('Risparmio del mese', `${eur0.format(r.netto)} di ${eur0.format(b.obiettivo_risparmio)}`, pctR, null, pctR >= 1 ? 'verde' : 'neutro',
-      `Entrate ${eur0.format(r.entrate)} meno uscite ${eur0.format(r.uscite)} finora. Si legge bene a fine mese, dopo gli stipendi.`) : ''}`;
+      `Entrate ${eur0.format(r.entrate)} meno uscite ${eur0.format(r.uscite)} finora. Si legge bene a fine mese, dopo gli stipendi.`) : ''}
+    ${straord > 0 ? `<div class="bg-straord"><strong>Spese straordinarie</strong><span>${eur0.format(straord)}</span><small>fuori dal tetto, ma contano nel risparmio</small></div>` : ''}`;
   const inserite = Object.keys(CHIUSURA).map(spesoCarta).filter(Boolean);
   const carte = ['carta_hb', 'amex'].filter(f => !inserite.some(c => c.fonte === f)).map(f => [f, ultimaDataFonte(f)]).filter(([, d]) => d && d < oggi);
-  $('#bg-mese-foot').textContent = `Spese variabili = tutte le uscite tranne spese fisse, bollette, condominio, rate e abbonamenti; i rimborsi le riducono. `
+  $('#bg-mese-foot').textContent = `Spese variabili = tutte le uscite tranne spese fisse, bollette, condominio, rate, abbonamenti e straordinarie; i rimborsi le riducono. `
     + `La tacca sulla barra indica dove dovresti essere oggi. `
     + (inserite.length ? `Speso con le carte inserito a mano: ${inserite.map(c => `${NOMI_CARTE[c.fonte]} ${eur0.format(c.speso)} al ${fmtGiorno(c.data)}`).join(', ')} (la parte non ancora importata è divisa per giorni). ` : '')
     + (carte.length ? `Le carte entrano con gli estratti: ${carte.map(([f, d]) => `${PAGAMENTI_SF[f]} fino al ${fmtGiorno(d)}`).join(', ')}.` : '');
+}
+
+// Box del mese successivo: entrate (a dicembre con la tredicesima), spese fisse del mese, bollette previste in pagamento, tetto
+function bolletteDelMese(k) {
+  const l = [
+    ...bolletteDaPagare().map(b => ({ ...b, nomeP: nomeBolletta(b), arrivata: true })),
+    ...prossimeBollette().map(r => ({ tipo: r.tipo, importo: Math.max(0, Math.round(r.stima)), data: r.dataPagamento, automatico: r.automatico, nomeP: nomePeriodo(r) })),
+  ];
+  return l.filter(b => ym(b.data) === k && b.importo > 0).sort((a, b) => a.data.localeCompare(b.data));
+}
+const nomeBolletta = b => b.tipo === 'acqua' ? `${b.codice.slice(4)}° trimestre ${b.codice.slice(0, 4)}` : nomeBimestre(b.codice);
+
+function renderPrevisione(k, stats) {
+  const b = budgetDel(k);
+  $('#bg-prev-titolo').textContent = `Previsione ${ymNome(k)}`;
+  const entrate = sommaImp(STIPENDI, st => importoStipendio(st, k));
+  const fisse = fisseDelMese(k);
+  const boll = bolletteDelMese(k), totBoll = sommaImp(boll);
+  const variabili = b ? b.tetto_variabili : stats.mediana;
+  const previsto = entrate - fisse - totBoll - variabili;
+  const dic = k.endsWith('-12');
+  const date = STIPENDI.map(st => fmtGiorno(dataStipendio(st, k)));
+  $('#bg-prev-kpis').innerHTML = `
+    <div class="kpi"><div class="label">Entrate previste</div><div class="value">${eur0.format(entrate)}</div><div class="sub">${dic ? `con la tredicesima, verso il ${date[0]}` : `il ${date.join(' e il ')}`}</div></div>
+    <div class="kpi"><div class="label">Spese fisse</div><div class="value">${eur0.format(fisse)}</div><div class="sub">del mese, comprese le annuali</div></div>
+    <div class="kpi"><div class="label">Bollette previste</div><div class="value">${totBoll ? '~' + eur0.format(totBoll) : '–'}</div><div class="sub">${boll.length ? `${boll.length} in pagamento nel mese` : 'nessuna prevista per ora'}</div></div>
+    <div class="kpi ${b && previsto < b.obiettivo_risparmio ? 'bg-rosso' : 'bg-verde'}"><div class="label">Risparmio previsto</div><div class="value">${eur0.format(previsto)}</div><div class="sub">${b ? `con il tetto di ${eur0.format(variabili)} · obiettivo ${eur0.format(b.obiettivo_risparmio)}` : `con spese variabili tipiche di ${eur0.format(variabili)}`}</div></div>`;
+  $('#bg-prev-bollette').innerHTML = boll.map(x => rigaUscita({ data: x.data, nome: `Bolletta ${NOMI[x.tipo].toLowerCase()} · ${x.nomeP}`, sotto: `${x.arrivata ? 'arrivata' : 'stima'}${x.automatico ? ', addebito diretto' : ', da pagare a mano'}`, importo: x.importo, stimato: !x.arrivata, colore: `--${x.tipo}` })).join('');
+  const nuoveFisse = tutteLeVoci().filter(s => attivaNelMese(s, k) && !attivaNelMese(s, ymAdd(k, -1)));
+  const finite = tutteLeVoci().filter(s => !attivaNelMese(s, k) && attivaNelMese(s, ymAdd(k, -1)) && s.frequenza === 'mensile');
+  $('#bg-prev-foot').textContent = (dic ? 'A dicembre gli stipendi arrivano verso il 15: per il Ministero vale l’accredito di dicembre dell’anno scorso, per MetLife il netto tipico più l’ultima tredicesima. ' : '')
+    + (nuoveFisse.length ? `Spese che ci sono solo in questo mese o iniziano ora: ${nuoveFisse.map(s => `${s.nome} ${eur0.format(s.importo)}`).join(', ')}. ` : '')
+    + (finite.length ? `Finite il mese prima: ${finite.map(s => s.nome).join(', ')}. ` : '')
+    + 'Le spese straordinarie non sono previste.';
 }
 
 function barra(titolo, valore, pct, tacca, stato, nota) {
@@ -399,11 +445,14 @@ function renderBudgetStorico(stats) {
   let datasets, foot;
   if (bgVista === 'variabili') {
     const tetti = righe.map(r => budgetDel(r.k)?.tetto_variabili ?? null);
+    const straord = righe.map(r => Math.round(straordinarieDelMese(r.k)));
     datasets = [
-      { type: 'bar', label: 'Spese variabili', data: righe.map(r => Math.round(r.totale)), backgroundColor: righe.map((r, i) => tetti[i] != null && r.totale > tetti[i] ? css('--uscite') : css('--rete')), borderRadius: 4, maxBarThickness: 40 },
-      { type: 'line', label: 'Tetto', data: tetti, borderColor: css('--accent'), borderDash: [5, 4], pointRadius: 0, stepped: 'middle', spanGaps: false },
+      { type: 'bar', label: 'Spese variabili', stack: 's', data: righe.map(r => Math.round(r.totale)), backgroundColor: righe.map((r, i) => tetti[i] != null && r.totale > tetti[i] ? css('--uscite') : css('--rete')), borderRadius: 4, maxBarThickness: 40 },
+      { type: 'bar', label: 'Straordinarie', stack: 's', data: straord.map(v => v || null), backgroundColor: css('--str'), borderRadius: 4, maxBarThickness: 40 },
+      { type: 'line', label: 'Tetto', stack: 't', data: tetti, borderColor: css('--accent'), borderDash: [5, 4], pointRadius: 0, stepped: 'middle', spanGaps: false },
     ];
-    foot = `Mediana degli ultimi 12 mesi: ${eur0.format(stats.mediana)} al mese. In rosso i mesi oltre il tetto. Il mese in corso è parziale.`;
+    opts.scales.x.stacked = true; opts.scales.y.stacked = true;
+    foot = `Mediana degli ultimi 12 mesi: ${eur0.format(stats.mediana)} al mese, senza le straordinarie (in viola, fuori dal tetto). In rosso i mesi oltre il tetto. Il mese in corso è parziale.`;
   } else {
     const ris = righe.map(r => risparmioDelMese(r.k).netto);
     const obiettivi = righe.map(r => budgetDel(r.k)?.obiettivo_risparmio ?? null);

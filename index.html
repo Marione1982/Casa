@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="styles.css?v=20261104-stipendio" />
+    <link rel="stylesheet" href="styles.css?v=20261105-1stipendio" />
   </head>
   <body>
     <!-- Accesso -->
@@ -317,6 +317,15 @@
 
           <article class="card">
             <header class="card-head">
+              <h2 id="bg-prev-titolo">Previsione</h2>
+            </header>
+            <div class="kpis kpis-fv" id="bg-prev-kpis"></div>
+            <div id="bg-prev-bollette" class="pross-lista"></div>
+            <p class="foot muted" id="bg-prev-foot"></p>
+          </article>
+
+          <article class="card">
+            <header class="card-head">
               <h2>Mese per mese</h2>
               <div class="segmented small" id="bg-vista">
                 <button type="button" data-vista="variabili" class="on">Spese variabili</button>
@@ -574,7 +583,7 @@
           <label>Vale da<input type="month" name="valido_dal" required /></label>
         </div>
         <div class="mov-info" id="bg-dialog-info"></div>
-        <p class="muted small-text">Le spese variabili sono tutte le uscite tranne spese fisse, bollette, condominio, rate e abbonamenti. Se cambi il tetto, i mesi precedenti restano confrontati con quello di allora.</p>
+        <p class="muted small-text">Le spese variabili sono tutte le uscite tranne spese fisse, bollette, condominio, rate, abbonamenti e spese straordinarie (categoria “Straordinarie”). Se cambi il tetto, i mesi precedenti restano confrontati con quello di allora.</p>
         <p id="bg-message" class="form-message" role="status"></p>
         <div class="dialog-actions">
           <span class="spacer"></span>
@@ -608,10 +617,10 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script src="supabase-config.js"></script>
     <script src="app.js?v=20261104-stipendio"></script>
-    <script src="movimenti.js?v=20261103-7"></script>
+    <script src="movimenti.js?v=20261105-1"></script>
     <script src="prossime.js?v=20261103-3"></script>
     <script src="spese.js?v=20261104-1"></script>
-    <script src="budget.js?v=20261104-3"></script>
+    <script src="budget.js?v=20261105-1"></script>
     <script src="stipendio.js?v=20261104-1"></script>
   </body>
 </html>

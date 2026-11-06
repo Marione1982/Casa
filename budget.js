@@ -294,8 +294,8 @@ function rigaUscita(u) {
 function renderStipendio(stats) {
   const oggi = oggiRoma();
   const saldo = ultimoSaldo();
-  // il saldo inserito comprende già gli addebiti fino al giorno prima: quelli del giorno stesso si contano ancora (per prudenza)
-  const base = piuGiorni(saldo ? saldo.data : oggi, -1);
+  // il saldo inserito comprende già gli addebiti fino al giorno del saldo compreso; senza saldo si parte da oggi
+  const base = saldo ? saldo.data : piuGiorni(oggi, -1);
   const periodi = periodiStipendio(base);
   if (!periodi.length) { $('#bg-stip-kpis').innerHTML = '<p class="muted">Nessuno stipendio trovato nei Movimenti.</p>'; return; }
   const b = budgetDel(ym(oggi));
@@ -344,7 +344,7 @@ function renderStipendio(stats) {
   }).join('');
   $('#bg-stip-dopo').innerHTML = dopo;
   const agg = ['conto_hb', 'carta_hb', 'amex', 'revolut'].map(f => [f, ultimaDataFonte(f)]).filter(([, d]) => d);
-  $('#bg-stip-foot').textContent = `Conta gli addebiti sul conto Hello (spese fisse, bollette, carta Hello e Amex) e il prestito Revolut, non ancora trovati nei Movimenti. `
+  $('#bg-stip-foot').textContent = (saldo ? `Gli addebiti fino al ${fmtGiorno(saldo.data)}, giorno del saldo, sono considerati già pagati. ` : '') + `Conta gli addebiti sul conto Hello (spese fisse, bollette, carta Hello e Amex) e il prestito Revolut, non ancora trovati nei Movimenti. `
     + `Le spese del giorno dello stipendio passano al periodo dopo. Se il giorno cade di sabato, domenica o festivo, lo stipendio arriva il giorno lavorativo prima; a dicembre verso il 15. `
     + `Movimenti importati fino al: ${agg.map(([f, d]) => `${PAGAMENTI_SF[f]} ${fmtGiorno(d)}`).join(', ')}.`;
 }
@@ -580,7 +580,7 @@ function aggiornaSaldoForm() {
   saldoForm.elements.saldo.min = carta ? '0' : '';
   $('#saldo-aiuto').textContent = carta
     ? `Quanto hai speso con la carta dall’ultimo estratto (chiude il ${CHIUSURA[saldoForm.elements.conto.value]} di ogni mese), come lo vedi nell’app della banca. Serve finché non importi il PDF dell’estratto.`
-    : 'Il saldo disponibile che vedi nell’app della banca. Da qui in poi l’app aggiunge i movimenti del conto che importi con data successiva.';
+    : 'Il saldo disponibile che vedi nell’app della banca. Gli addebiti previsti fino a questa data si considerano già passati; da qui in poi l’app aggiunge i movimenti del conto che importi con data successiva.';
 }
 function apriSaldo() {
   saldoForm.reset();
